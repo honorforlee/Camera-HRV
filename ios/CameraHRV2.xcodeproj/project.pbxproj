@@ -37,7 +37,7 @@
 		5B6E9F721BD94BE6A5249621 /* libRNSVG.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D326C8C06034F4AB8536F25 /* libRNSVG.a */; };
 		5E9157361DD0AC6A00FF2AA8 /* libRCTAnimation.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5E9157331DD0AC6500FF2AA8 /* libRCTAnimation.a */; };
 		832341BD1AAA6AB300B99B32 /* libRCTText.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 832341B51AAA6A8300B99B32 /* libRCTText.a */; };
-		A504F1BC1F55088F003A8CC7 /* CameraController.m in Sources */ = {isa = PBXBuildFile; fileRef = A504F1BA1F55088E003A8CC7 /* CameraController.m */; };
+		A50131B61F8ECA1E003CD28A /* CameraController.m in Sources */ = {isa = PBXBuildFile; fileRef = A50131B51F8ECA1E003CD28A /* CameraController.m */; };
 		A5084C171F81DFC600E30F30 /* heart-icon.png in Resources */ = {isa = PBXBuildFile; fileRef = A5084C161F81DFC600E30F30 /* heart-icon.png */; };
 		A54E1E931F5903E9000DCCBF /* libART.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A54E1E901F5903D9000DCCBF /* libART.a */; };
 /* End PBXBuildFile section */
@@ -317,8 +317,8 @@
 		78C398B01ACF4ADC00677621 /* RCTLinking.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = RCTLinking.xcodeproj; path = "../node_modules/react-native/Libraries/LinkingIOS/RCTLinking.xcodeproj"; sourceTree = "<group>"; };
 		832341B01AAA6A8300B99B32 /* RCTText.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = RCTText.xcodeproj; path = "../node_modules/react-native/Libraries/Text/RCTText.xcodeproj"; sourceTree = "<group>"; };
 		8D326C8C06034F4AB8536F25 /* libRNSVG.a */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = archive.ar; path = libRNSVG.a; sourceTree = "<group>"; };
-		A504F1BA1F55088E003A8CC7 /* CameraController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = CameraController.m; path = ../../CameraHRV/ios/CameraController.m; sourceTree = "<group>"; };
-		A504F1BB1F55088E003A8CC7 /* CameraController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CameraController.h; path = ../../CameraHRV/ios/CameraController.h; sourceTree = "<group>"; };
+		A50131B41F8ECA1E003CD28A /* CameraController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CameraController.h; path = CameraHRV2/CameraController/CameraController.h; sourceTree = "<group>"; };
+		A50131B51F8ECA1E003CD28A /* CameraController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = CameraController.m; path = CameraHRV2/CameraController/CameraController.m; sourceTree = "<group>"; };
 		A5084C161F81DFC600E30F30 /* heart-icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "heart-icon.png"; path = "CameraHRV2/heart-icon.png"; sourceTree = "<group>"; };
 		A54E1E8A1F5903D9000DCCBF /* ART.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = ART.xcodeproj; path = "../node_modules/react-native/Libraries/ART/ART.xcodeproj"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -457,9 +457,9 @@
 		13B07FAE1A68108700A75B9A /* CameraHRV2 */ = {
 			isa = PBXGroup;
 			children = (
+				A50131B41F8ECA1E003CD28A /* CameraController.h */,
+				A50131B51F8ECA1E003CD28A /* CameraController.m */,
 				A5084C161F81DFC600E30F30 /* heart-icon.png */,
-				A504F1BB1F55088E003A8CC7 /* CameraController.h */,
-				A504F1BA1F55088E003A8CC7 /* CameraController.m */,
 				008F07F21AC5B25A0029DE68 /* main.jsbundle */,
 				13B07FAF1A68108700A75B9A /* AppDelegate.h */,
 				13B07FB01A68108700A75B9A /* AppDelegate.m */,
@@ -1079,7 +1079,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				13B07FBC1A68108700A75B9A /* AppDelegate.m in Sources */,
-				A504F1BC1F55088F003A8CC7 /* CameraController.m in Sources */,
+				A50131B61F8ECA1E003CD28A /* CameraController.m in Sources */,
 				13B07FC11A68108700A75B9A /* main.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
