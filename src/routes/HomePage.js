@@ -10,7 +10,7 @@ import {Actions} from 'react-native-router-flux';
 
 //import PixelColor from 'react-native-pixel-color';
 
-//import { Surface } from "gl-react-native";	
+//import { Surface } from "gl-react-native";
 //import Saturate from './Saturate';
 
 
@@ -90,15 +90,15 @@ export default class HomePage extends Component {
         // New RMS alg:
         var rms = Math.pow(signal[WINDOW_SIZE-2][1]-signal[WINDOW_SIZE-3][1],2) + Math.pow(signal[WINDOW_SIZE-3][1]-signal[WINDOW_SIZE-4][1],2) + Math.pow(signal[WINDOW_SIZE-4][1]-signal[WINDOW_SIZE-5][1],2);
         rms = Math.sqrt(rms);
-        rms /= 3; 
+        rms /= 3;
         //new_val = rms;
         //--------
 
 
-        chart.push({time: cnt, value: 1000-int_data}); 
+        chart.push({time: cnt, value: 2000-int_data}); 
         // signal_ac.push(remove_dc);
         signal.push([cnt,int_data]);
-        this.state.signal_avg = this.state.signal_avg * 0.9 + parseInt(data) * 0.1;  
+        this.state.signal_avg = this.state.signal_avg * 0.9 + parseInt(data) * 0.1;
 
 
         if(window_idx==WINDOW_SIZE-20){
@@ -110,7 +110,7 @@ export default class HomePage extends Component {
     }
 
     peakDetection(){
-        
+
 
         var up = false;
         var upcounter = 0;
@@ -123,7 +123,7 @@ export default class HomePage extends Component {
             if(up){
                 if(chart[i+1].value > chart[i].value){
                     console.log("Up:up, index: ",i," ,Value: ",chart[i].value ,"\n");
-                   
+
                     if(chart[i+1].value > peak_val){
                         peak_idx = i+1;
                         peak_val = chart[i+1].value;
@@ -151,7 +151,7 @@ export default class HomePage extends Component {
                         rr.push({time:chart[peak_idx].time,value:chart[peak_idx].value});
                         peak_val = 0;
                     }
-                }               
+                }
             }
             else{
                 if(chart[i+1].value > chart[i].value){
@@ -267,11 +267,11 @@ export default class HomePage extends Component {
                             thickness= {10}
                             progress={this.state.hrvProgress}
                             indeterminate={this.state.indeterminate}
-                          />                            
+                          />
                         </View>
 
                         <View style={{flex: 2}}>
-                            
+
                             <Text style={{fontSize: 20,fontWeight: 'bold'}} >{this.state.rgb}</Text>
                             <View  style={{flex: 1, backgroundColor: 'powderblue',flexDirection: 'column', justifyContent: 'center', alignItems: 'center'}}>
 
@@ -284,15 +284,15 @@ export default class HomePage extends Component {
 
                                 <Text style={{fontSize: 40,fontWeight: 'bold', justifyContent: 'center'}} >{this.state.hrv}</Text>
                             </View>
-                            
+
 
                             <View style={{flex: 4}}>
                                 <VictoryChart theme={VictoryTheme.material}>
 
                                     <VictoryLine
-                                        style={{ 
+                                        style={{
                                             parent: {border: "1px solid #ccc"},
-                                            data: { stroke: "#c43a31", strokeWidth: 2 } 
+                                            data: { stroke: "#c43a31", strokeWidth: 2 }
                                         }}
                                         domain={{y: [this.state.int_avg-70, this.state.int_avg+70]}}
                                         data={chart}
@@ -305,7 +305,7 @@ export default class HomePage extends Component {
                                         domain={{y: [this.state.int_avg-70, this.state.int_avg+70]}}
                                         data={chart2}
                                         x="time"
-                                        y="value"  />            
+                                        y="value"  />
 
 
                                 </VictoryChart>
@@ -319,7 +319,7 @@ export default class HomePage extends Component {
 
             );
        }
-    
+
 }
 
 
@@ -349,9 +349,3 @@ const styles = StyleSheet.create({
         alignItems: 'center'
     }
 });
-
-
-
-
-
-

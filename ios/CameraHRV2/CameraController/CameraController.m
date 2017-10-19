@@ -12,6 +12,7 @@
 #import <AVFoundation/AVFoundation.h>
 #import <CoreImage/CoreImage.h>
 #import <React/RCTUtils.h>
+#import <Accelerate/Accelerate.h>
 #include "math.h"
 #import <GLKit/GLKit.h>
 #import "AppDelegate.h"
@@ -72,8 +73,7 @@ RCT_EXPORT_METHOD(turnTorchOn: (BOOL) on) {
 
 RCT_EXPORT_METHOD (stop){
 #if TARGET_IPHONE_SIMULATOR
-  self.camera = nil;
-  return;
+  //return;
 #endif
   dispatch_async(self.captureSessionQueue, ^{
 //    [self.previewLayer removeFromSuperlayer];
@@ -97,6 +97,8 @@ RCT_EXPORT_METHOD(start)
   // get the input device and also validate the settings
   NSArray *videoDevices = [AVCaptureDevice devicesWithMediaType:AVMediaTypeVideo];
   
+  
+  // Set to use the rear camera on the device
   AVCaptureDevicePosition position = AVCaptureDevicePositionBack;
   
   for (AVCaptureDevice *device in videoDevices)
@@ -108,8 +110,8 @@ RCT_EXPORT_METHOD(start)
   }
   
   // added by babak for frame rate:
-  AVCaptureDeviceFormat *bestFormat = nil;
-  AVFrameRateRange *bestFrameRateRange = nil;
+//  AVCaptureDeviceFormat *bestFormat = nil;
+//  AVFrameRateRange *bestFrameRateRange = nil;
 //  for ( AVCaptureDeviceFormat *format in [_videoDevice formats] ) {
 //    NSLog(@"~~~~~~~~~~~~~~");
 //    for ( AVFrameRateRange *range in format.videoSupportedFrameRateRanges ) {
@@ -200,6 +202,9 @@ RCT_EXPORT_METHOD(start)
   _captureSessionQueue = dispatch_queue_create("capture_session_queue", NULL);
   [videoDataOutput setSampleBufferDelegate:self queue:_captureSessionQueue];
   
+  
+  // This blocks frames that are captured while the dispatch queue
+  // is in the Output Capture method
   videoDataOutput.alwaysDiscardsLateVideoFrames = YES;
   
   // begin configure capture session
@@ -263,20 +268,25 @@ RCT_EXPORT_METHOD(start)
   NSLog(@"captureoutput\n %d",_testn);
   self.testn = self.testn + 1;
   
-  
+  // Get a reference to the image within the sample buffer.
+  // Not owned by captureOutput
   CVImageBufferRef imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
+  
+  // Creates a new image based off of the data in imageBuffer
   CIImage *sourceImage = [CIImage imageWithCVPixelBuffer:(CVPixelBufferRef)imageBuffer options:nil];
   //CGRect sourceExtent = sourceImage.extent;
   
   
   //Babak Image Proc
   CIContext *temporaryContext = [CIContext contextWithOptions:nil];
+  
+  // Create a CGImageRef for processing, created from sourceImage
   CGImageRef videoImage = [temporaryContext
                            createCGImage:sourceImage
                            fromRect:CGRectMake(0, 0,
                                                CVPixelBufferGetWidth(imageBuffer),
                                                CVPixelBufferGetHeight(imageBuffer))];
-  
+  // Create a UIImage based off of the CGImageRef that we just created
   UIImage *image = [[UIImage alloc] initWithCGImage:videoImage];
   CGImageRelease(videoImage);
   
@@ -288,6 +298,7 @@ RCT_EXPORT_METHOD(start)
   
   size_t width  = CGImageGetWidth(cgimage);
   size_t height = CGImageGetHeight(cgimage);
+  size_t numPixels = width * height;
   
   size_t bpr = CGImageGetBytesPerRow(cgimage);
   
@@ -321,34 +332,55 @@ RCT_EXPORT_METHOD(start)
   int brightness = 0;
   
 //  NSLog(@"width: %d, height: %d, bytesperow: %d, bytesperpixel: %d\n",width,height,bytesPerRow,bytesPerPixel);
-  for (int n = 0; n<(width*height); n+=50){
-    
-    int index = (bytesPerRow * y) + x * bytesPerPixel;
-    int red   = rawData[index];
-    int green = rawData[index + 1];
-    int blue  = rawData[index + 2];
-    //int alpha = rawData[index + 3];
-    
-    total_red += red;
-    total_green += green;
-    total_blue += blue;
+//  for (int n = 0; n<(width*height); n+=50){
+//
+//    int index = (bytesPerRow * y) + x * bytesPerPixel;
+//    int red   = rawData[index];
+//    int green = rawData[index + 1];
+//    int blue  = rawData[index + 2];
+//    //int alpha = rawData[index + 3];
+//
+//    total_red += red;
+//    total_green += green;
+//    total_blue += blue;
+//
+//    /* NSArray * a = [NSArray arrayWithObjects:[NSString stringWithFormat:@"%i",red],[NSString stringWithFormat:@"%i",green],[NSString stringWithFormat:@"%i",blue],[NSString stringWithFormat:@"%i",alpha], nil];
+//     [colours addObject:a];
+//     */
+//    x+=50;
+//    if (x==width){
+//      x=0;
+//      y++;
+//    }
+//  }
+//
+  
+  float redVector [numPixels];
+  float greenVector [numPixels];
+  float blueVector [numPixels];
+  
+  // Convert image to floats so that accelerate may be used
+//  vDSP_vfltu8(rawData, 4, redVector, 1, numPixels);
+//  vDSP_vfltu8(rawData + 1, 4, greenVector, 1, numPixels);
+//  vDSP_vfltu8(rawData + 2, 4, blueVector, 1, numPixels);
 
-    /* NSArray * a = [NSArray arrayWithObjects:[NSString stringWithFormat:@"%i",red],[NSString stringWithFormat:@"%i",green],[NSString stringWithFormat:@"%i",blue],[NSString stringWithFormat:@"%i",alpha], nil];
-     [colours addObject:a];
-     */
-    x+=50;
-    if (x==width){
-      x=0;
-      y++;
-    }
-  }
   
-  total_red /= (width*height/500);
-  total_green /= (width*height/500);
-  total_blue /= (width*height/500);
+//  total_red /= (width*height/500);
+//  total_green /= (width*height/500);
+//  total_blue /= (width*height/500);
   
-  brightness = sqrt(total_red * total_red * 0.241+ total_blue * total_blue * 0.068 + total_green * total_green * 0.691);
+  float avgRed;
+  float avgBlue;
+  float avgGreen;
   
+  // Find average of each color in the image
+  vDSP_meamgv(redVector, 1, &avgRed, 1);
+  vDSP_meamgv(blueVector, 1, &avgBlue, 1);
+  vDSP_meamgv(greenVector, 1, &avgGreen, 1);
+
+//  brightness = sqrt(total_red * total_red * 0.241+ total_blue * total_blue * 0.068 + total_green * total_green * 0.691);
+  brightness = sqrt(pow(avgRed, 2.0) * 0.241 + pow(avgBlue, 2.0) * 0.068 + pow(avgGreen, 2.0) * 0.691);
+
   free(rawData);
 
   //NSLog(@"Total Red: %d\n",total_red);
