@@ -355,14 +355,16 @@ RCT_EXPORT_METHOD(start)
 //  }
 //
   
-  float redVector [numPixels];
-  float greenVector [numPixels];
-  float blueVector [numPixels];
+  // TODO(Tyler): Check for null as the returned value from malloc
+  float *redVector = malloc(numPixels * sizeof(float32_t));
+  float *greenVector = malloc(numPixels * sizeof(float32_t));
+  float *blueVector = malloc(numPixels * sizeof(float32_t));
+
   
   // Convert image to floats so that accelerate may be used
-//  vDSP_vfltu8(rawData, 4, redVector, 1, numPixels);
-//  vDSP_vfltu8(rawData + 1, 4, greenVector, 1, numPixels);
-//  vDSP_vfltu8(rawData + 2, 4, blueVector, 1, numPixels);
+  vDSP_vfltu8(rawData, 4, redVector, 1, numPixels);
+  vDSP_vfltu8(rawData + 1, 4, greenVector, 1, numPixels);
+  vDSP_vfltu8(rawData + 2, 4, blueVector, 1, numPixels);
 
   
 //  total_red /= (width*height/500);
@@ -382,6 +384,10 @@ RCT_EXPORT_METHOD(start)
   brightness = sqrt(pow(avgRed, 2.0) * 0.241 + pow(avgBlue, 2.0) * 0.068 + pow(avgGreen, 2.0) * 0.691);
 
   free(rawData);
+  free(redVector);
+  free(blueVector);
+  free(greenVector);
+
 
   //NSLog(@"Total Red: %d\n",total_red);
   
