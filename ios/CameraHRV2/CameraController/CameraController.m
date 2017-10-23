@@ -131,9 +131,8 @@ RCT_EXPORT_METHOD(start)
 //      [_videoDevice unlockForConfiguration];
 //    }
 //  }
-  
- 
-  
+//
+
 //    NSError *errors;
 //    CMTime frameDuration = CMTimeMake(1, 60);
 //    NSArray *supportedFrameRateRanges = [_videoDevice.activeFormat videoSupportedFrameRateRanges];
@@ -218,7 +217,7 @@ RCT_EXPORT_METHOD(start)
   }
   
     NSLog(@"Semi Final 3 spec:: %lld, %d\n", _videoDevice.activeVideoMinFrameDuration.value, _videoDevice.activeVideoMinFrameDuration.timescale);
-  
+
   // connect the video device input and video data and still image outputs
   [_captureSession addInput:videoDeviceInput];
   
@@ -271,39 +270,18 @@ RCT_EXPORT_METHOD(start)
   // Get a reference to the image within the sample buffer.
   // Not owned by captureOutput
   CVImageBufferRef imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
+  CVPixelBufferLockBaseAddress(imageBuffer, kCVPixelBufferLock_ReadOnly);
   
-  // Creates a new image based off of the data in imageBuffer
-  CIImage *sourceImage = [CIImage imageWithCVPixelBuffer:(CVPixelBufferRef)imageBuffer options:nil];
-  //CGRect sourceExtent = sourceImage.extent;
+  size_t width  = CVPixelBufferGetWidth(imageBuffer);
+  size_t height = CVPixelBufferGetHeight(imageBuffer);
   
+  size_t bytesPerRow = CVPixelBufferGetBytesPerRow(imageBuffer);
   
-  //Babak Image Proc
-  CIContext *temporaryContext = [CIContext contextWithOptions:nil];
-  
-  // Create a CGImageRef for processing, created from sourceImage
-  CGImageRef videoImage = [temporaryContext
-                           createCGImage:sourceImage
-                           fromRect:CGRectMake(0, 0,
-                                               CVPixelBufferGetWidth(imageBuffer),
-                                               CVPixelBufferGetHeight(imageBuffer))];
-  // Create a UIImage based off of the CGImageRef that we just created
-  UIImage *image = [[UIImage alloc] initWithCGImage:videoImage];
-  CGImageRelease(videoImage);
-  
-  CGImageRef cgimage = [image CGImage];
-  
-  
-  
-  
-  
-  size_t width  = CGImageGetWidth(cgimage);
-  size_t height = CGImageGetHeight(cgimage);
-  size_t numPixels = width * height;
-  
-  size_t bpr = CGImageGetBytesPerRow(cgimage);
-  
-  size_t bpp = CGImageGetBitsPerPixel(cgimage);
-  size_t bpc = CGImageGetBitsPerComponent(cgimage);
+  // For now, we assume each pixel is 8 bits, and 4 layers per pixel
+  // This is because we set CVPixelFormatType_32BGRA up above
+
+  size_t bpp = 32;
+  size_t bpc = 8;
   //NSLog(@"bpc: %lu\n",bpc);
   
   if(bpc == 0){
@@ -313,80 +291,74 @@ RCT_EXPORT_METHOD(start)
   }
   size_t bytes_per_pixel = bpp / bpc;
   
-  CGImageRef imageRef = cgimage;
-  CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-  unsigned char *rawData = (unsigned char*) calloc(width * height * 4, sizeof(unsigned char));
+  unsigned char *rawData = CVPixelBufferGetBaseAddress(imageBuffer);
   NSUInteger bytesPerPixel = bytes_per_pixel;
-  NSUInteger bytesPerRow = bpr;
-  NSUInteger bitsPerComponent = bpc;
-  CGContextRef context = CGBitmapContextCreate(rawData, width, height, bitsPerComponent, bytesPerRow, colorSpace, kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
-  CGColorSpaceRelease(colorSpace);
-  CGContextDrawImage(context, CGRectMake(0, 0, width, height), imageRef);
-  CGContextRelease(context);
-  float x = 0;
-  float y = 0;
+
+  int x = 0;
+  int y = 0;
   int total_red = 0;
   int total_green = 0;
   int total_blue = 0;
   //int total_alpha = 0;
   int brightness = 0;
   
-//  NSLog(@"width: %d, height: %d, bytesperow: %d, bytesperpixel: %d\n",width,height,bytesPerRow,bytesPerPixel);
-//  for (int n = 0; n<(width*height); n+=50){
-//
-//    int index = (bytesPerRow * y) + x * bytesPerPixel;
-//    int red   = rawData[index];
-//    int green = rawData[index + 1];
-//    int blue  = rawData[index + 2];
-//    //int alpha = rawData[index + 3];
-//
-//    total_red += red;
-//    total_green += green;
-//    total_blue += blue;
-//
-//    /* NSArray * a = [NSArray arrayWithObjects:[NSString stringWithFormat:@"%i",red],[NSString stringWithFormat:@"%i",green],[NSString stringWithFormat:@"%i",blue],[NSString stringWithFormat:@"%i",alpha], nil];
-//     [colours addObject:a];
-//     */
-//    x+=50;
-//    if (x==width){
-//      x=0;
-//      y++;
-//    }
-//  }
-//
+  // NSLog(@"width: %d, height: %d, bytesperow: %d, bytesperpixel: %d\n",width,height,bytesPerRow,bytesPerPixel);
+  
+  for (int n = 0; n<(width*height); n+=50){
+
+    unsigned long index = (bytesPerRow * y) + x * bytesPerPixel;
+    // Image stored in BGRA
+    int blue  = rawData[index];
+    int green = rawData[index + 1];
+    int red   = rawData[index + 2];
+    //int alpha = rawData[index + 3];
+
+    total_red += red;
+    total_green += green;
+    total_blue += blue;
+
+    /* NSArray * a = [NSArray arrayWithObjects:[NSString stringWithFormat:@"%i",red],[NSString stringWithFormat:@"%i",green],[NSString stringWithFormat:@"%i",blue],[NSString stringWithFormat:@"%i",alpha], nil];
+     [colours addObject:a];
+     */
+    x+=50;
+    if (x==width){
+      x=0;
+      y++;
+    }
+  }
+  CVPixelBufferUnlockBaseAddress(imageBuffer, kCVPixelBufferLock_ReadOnly);
   
   // TODO(Tyler): Check for null as the returned value from malloc
-  float *redVector = malloc(numPixels * sizeof(float32_t));
-  float *greenVector = malloc(numPixels * sizeof(float32_t));
-  float *blueVector = malloc(numPixels * sizeof(float32_t));
+//  float *redVector = malloc(numPixels * sizeof(float32_t));
+//  float *greenVector = malloc(numPixels * sizeof(float32_t));
+//  float *blueVector = malloc(numPixels * sizeof(float32_t));
 
   
   // Convert image to floats so that accelerate may be used
-  vDSP_vfltu8(rawData, 4, redVector, 1, numPixels);
-  vDSP_vfltu8(rawData + 1, 4, greenVector, 1, numPixels);
-  vDSP_vfltu8(rawData + 2, 4, blueVector, 1, numPixels);
+//  vDSP_vfltu8(rawData, 4, redVector, 1, numPixels);
+//  vDSP_vfltu8(rawData + 1, 4, greenVector, 1, numPixels);
+//  vDSP_vfltu8(rawData + 2, 4, blueVector, 1, numPixels);
 
   
-//  total_red /= (width*height/500);
-//  total_green /= (width*height/500);
-//  total_blue /= (width*height/500);
+  total_red /= (width*height/500);
+  total_green /= (width*height/500);
+  total_blue /= (width*height/500);
   
-  float avgRed;
-  float avgBlue;
-  float avgGreen;
+//  float avgRed;
+//  float avgBlue;
+//  float avgGreen;
   
   // Find average of each color in the image
-  vDSP_meamgv(redVector, 1, &avgRed, 1);
-  vDSP_meamgv(blueVector, 1, &avgBlue, 1);
-  vDSP_meamgv(greenVector, 1, &avgGreen, 1);
+//  vDSP_meamgv(redVector, 1, &avgRed, 1);
+//  vDSP_meamgv(blueVector, 1, &avgBlue, 1);
+//  vDSP_meamgv(greenVector, 1, &avgGreen, 1);
 
-//  brightness = sqrt(total_red * total_red * 0.241+ total_blue * total_blue * 0.068 + total_green * total_green * 0.691);
-  brightness = sqrt(pow(avgRed, 2.0) * 0.241 + pow(avgBlue, 2.0) * 0.068 + pow(avgGreen, 2.0) * 0.691);
-
-  free(rawData);
-  free(redVector);
-  free(blueVector);
-  free(greenVector);
+  brightness = sqrt(total_red * total_red * 0.241+ total_blue * total_blue * 0.068 + total_green * total_green * 0.691);
+//  brightness = sqrt(pow(avgRed, 2.0) * 0.241 + pow(avgBlue, 2.0) * 0.068 + pow(avgGreen, 2.0) * 0.691);
+  
+//  free(redVector);
+//  free(blueVector);
+//  free(greenVector);
 
 
   //NSLog(@"Total Red: %d\n",total_red);
