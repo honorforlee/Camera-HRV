@@ -3,10 +3,10 @@ import {StyleSheet, View, TextInput, Text, TouchableOpacity, AsyncStorage} from 
 import {Actions} from 'react-native-router-flux';
 
 export default class LoginForm extends Component{
-  
+
     constructor() {
         super();
-        this.state = { 
+        this.state = {
             email: null,
             password: null
         };
@@ -37,7 +37,7 @@ export default class LoginForm extends Component{
             if(responseData.success){
                 // TODO : For server middleware ('hasAccess')
                 //this.saveItem('id_token', responseData.token);
-                Actions.HomePage();        
+                Actions.HomePage();
             }
             else{
                 alert('Wrong username/password');
@@ -52,23 +52,25 @@ export default class LoginForm extends Component{
     render() {
         return(
             <View  style = {styles.container}>
-                <TextInput 
+                <TextInput
                     placeholder = " username or email"
                     returnKeyType="next"
                     onChangeText={(email) => this.setState({email})}
                     onSubmitEditing = {() => this.passwordInput.focus()}
                     autoCapitalize="none"
+                    autoCorrect={false}
                     style = {styles.input} />
 
-                <TextInput 
+                <TextInput
                     placeholder = " password"
                     secureTextEntry = {true}
                     returnKeyType="go"
                     onChangeText={(password) => this.setState({password})}
                     ref = {(input) => this.passwordInput = input}
                     autoCapitalize="none"
+                    autoCorrect={false}
                     style = {styles.input} />
-                    
+
                 <TouchableOpacity style={styles.buttonContainer} onPress={this.userLogin.bind(this)}>
                     <Text style={styles.buttonText}>Login</Text>
                 </TouchableOpacity>
