@@ -97,7 +97,6 @@ RCT_EXPORT_METHOD(start)
   // get the input device and also validate the settings
   NSArray *videoDevices = [AVCaptureDevice devicesWithMediaType:AVMediaTypeVideo];
   
-  
   // Set to use the rear camera on the device
   AVCaptureDevicePosition position = AVCaptureDevicePositionBack;
   
@@ -108,66 +107,6 @@ RCT_EXPORT_METHOD(start)
       break;
     }
   }
-  
-  // added by babak for frame rate:
-//  AVCaptureDeviceFormat *bestFormat = nil;
-//  AVFrameRateRange *bestFrameRateRange = nil;
-//  for ( AVCaptureDeviceFormat *format in [_videoDevice formats] ) {
-//    NSLog(@"~~~~~~~~~~~~~~");
-//    for ( AVFrameRateRange *range in format.videoSupportedFrameRateRanges ) {
-//      if ( range.maxFrameRate > bestFrameRateRange.maxFrameRate ) {
-//        bestFormat = format;
-//        bestFrameRateRange = range;
-//        NSLog(@"--- Apparently working with  : %f, %f\n",range.minFrameRate,range.maxFrameRate);
-//      }
-//    }
-//  }
-//  if ( bestFormat ) {
-//    if ( [_videoDevice lockForConfiguration:NULL] == YES ) {
-//      _videoDevice.activeFormat = bestFormat;
-//      _videoDevice.activeVideoMinFrameDuration = bestFrameRateRange.minFrameDuration;
-//      _videoDevice.activeVideoMaxFrameDuration = bestFrameRateRange.minFrameDuration;
-//      NSLog(@"--- settle with  : %lld, %d\n",bestFrameRateRange.minFrameDuration.value,bestFrameRateRange.minFrameDuration.timescale);
-//      [_videoDevice unlockForConfiguration];
-//    }
-//  }
-//
-
-//    NSError *errors;
-//    CMTime frameDuration = CMTimeMake(1, 60);
-//    NSArray *supportedFrameRateRanges = [_videoDevice.activeFormat videoSupportedFrameRateRanges];
-//    BOOL frameRateSupported = NO;
-//    for (AVFrameRateRange *range in supportedFrameRateRanges) {
-//      NSLog(@"--- First Frame Rate:--- min: %f, max: %f\n",range.minFrameRate,range.maxFrameRate);
-//      if (CMTIME_COMPARE_INLINE(frameDuration, >=, range.minFrameDuration) &&
-//          CMTIME_COMPARE_INLINE(frameDuration, <=, range.maxFrameDuration)) {
-//        frameRateSupported = YES;
-//      }
-//    }
-//
-//    if (frameRateSupported && [_videoDevice lockForConfiguration:&errors]) {
-//      [_videoDevice setActiveVideoMaxFrameDuration:frameDuration];
-//      [_videoDevice setActiveVideoMinFrameDuration:frameDuration];
-//      [_videoDevice unlockForConfiguration];
-//      NSLog(@"---Frame Rate:--- Succeded\n");
-//    }
-//    else
-//      NSLog(@"---Frame Rate:--- Not Succeded :(\n");
-//
-//
-//    for (AVCaptureDeviceFormat *vFormat in _videoDevice.formats) {
-//
-//      // 2
-//      NSArray<AVFrameRateRange *> *ranges = vFormat.videoSupportedFrameRateRanges;
-//      AVFrameRateRange *frameRates = ranges[0];
-//
-//      NSLog(@"---Frame Rate:---  %f, %f , %@\n",frameRates.minFrameRate, frameRates.maxFrameRate, vFormat.mediaType);
-//      // 3
-//
-//    }
-  //---------------------------
-
-
   
   // obtain device input
   NSError *error = nil;
@@ -202,8 +141,8 @@ RCT_EXPORT_METHOD(start)
   [videoDataOutput setSampleBufferDelegate:self queue:_captureSessionQueue];
   
   
-  // This blocks frames that are captured while the dispatch queue
-  // is in the Output Capture method
+  // This causes frames that are captured while the dispatch queue
+  // is in the Output Capture method to be ignored
   videoDataOutput.alwaysDiscardsLateVideoFrames = YES;
   
   // begin configure capture session
@@ -216,44 +155,36 @@ RCT_EXPORT_METHOD(start)
     return;
   }
   
-    NSLog(@"Semi Final 3 spec:: %lld, %d\n", _videoDevice.activeVideoMinFrameDuration.value, _videoDevice.activeVideoMinFrameDuration.timescale);
-
   // connect the video device input and video data and still image outputs
   [_captureSession addInput:videoDeviceInput];
   
-  // --- added by babak:
-//  bool found_format = 0;
+  // added by babak to select highest frame rate:
+//  AVCaptureDeviceFormat *bestFormat = nil;
+//  AVFrameRateRange *bestFrameRateRange = nil;
 //  for ( AVCaptureDeviceFormat *format in [_videoDevice formats] ) {
 //    NSLog(@"~~~~~~~~~~~~~~");
 //    for ( AVFrameRateRange *range in format.videoSupportedFrameRateRanges ) {
 //      if ( range.maxFrameRate > bestFrameRateRange.maxFrameRate ) {
 //        bestFormat = format;
 //        bestFrameRateRange = range;
-//        NSLog(@"--- Apparently working with  : %f, %f\n",range.minFrameRate,range.maxFrameRate);
-//        if(range.maxFrameRate == 600){
-//          found_format = 1;
-//          break;
-//        }
+//        NSLog(@"--- Switching to frame rate  : %f, %f\n",range.minFrameRate,range.maxFrameRate);
 //      }
 //    }
-//    if(found_format)
-//      break;
 //  }
 //  if ( bestFormat ) {
 //    if ( [_videoDevice lockForConfiguration:NULL] == YES ) {
 //      _videoDevice.activeFormat = bestFormat;
 //      _videoDevice.activeVideoMinFrameDuration = bestFrameRateRange.minFrameDuration;
 //      _videoDevice.activeVideoMaxFrameDuration = bestFrameRateRange.minFrameDuration;
-//      NSLog(@"--- settle with  : %lld, %d\n",bestFrameRateRange.minFrameDuration.value,bestFrameRateRange.minFrameDuration.timescale);
+//      NSLog(@"--- Selected as highest framerate  : %lld, %d\n",bestFrameRateRange.minFrameDuration.value,bestFrameRateRange.minFrameDuration.timescale);
 //      [_videoDevice unlockForConfiguration];
 //    }
 //  }
-  //-----------------
 
+  NSLog(@"Semi Final 3 spec:: %lld, %d\n", _videoDevice.activeVideoMinFrameDuration.value, _videoDevice.activeVideoMinFrameDuration.timescale);
+  
   [_captureSession addOutput:videoDataOutput];
   [_captureSession commitConfiguration];
-  
-  
   
   NSLog(@"Final spec:: %lld, %d\n", _videoDevice.activeVideoMinFrameDuration.value, _videoDevice.activeVideoMinFrameDuration.timescale);
   
