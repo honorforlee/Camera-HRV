@@ -3,10 +3,10 @@ import {StyleSheet, View, TextInput, Text, TouchableOpacity, AsyncStorage} from 
 import {Actions} from 'react-native-router-flux';
 
 export default class LoginForm extends Component{
-  
+
     constructor() {
         super();
-        this.state = { 
+        this.state = {
             email: null,
             password: null
         };
@@ -23,7 +23,6 @@ export default class LoginForm extends Component{
     userLogin() {
         if (!this.state.email || !this.state.password) return;
         // TODO: localhost doesn't work because the app is running inside an emulator. Get the IP address with ifconfig.
- //       Actions.HomePage();
         fetch('http://er-lab.cs.ucla.edu/mobile/login', {
             method: 'POST',
             headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
@@ -37,7 +36,7 @@ export default class LoginForm extends Component{
             if(responseData.success){
                 // TODO : For server middleware ('hasAccess')
                 //this.saveItem('id_token', responseData.token);
-                Actions.HomePage();        
+                Actions.HomePage();
             }
             else{
                 alert('Wrong username/password');
@@ -52,7 +51,7 @@ export default class LoginForm extends Component{
     render() {
         return(
             <View  style = {styles.container}>
-                <TextInput 
+                <TextInput
                     placeholder = " username or email"
                     returnKeyType="next"
                     onChangeText={(email) => this.setState({email})}
@@ -60,7 +59,7 @@ export default class LoginForm extends Component{
                     autoCapitalize="none"
                     style = {styles.input} />
 
-                <TextInput 
+                <TextInput
                     placeholder = " password"
                     secureTextEntry = {true}
                     returnKeyType="go"
@@ -68,7 +67,7 @@ export default class LoginForm extends Component{
                     ref = {(input) => this.passwordInput = input}
                     autoCapitalize="none"
                     style = {styles.input} />
-                    
+
                 <TouchableOpacity style={styles.buttonContainer} onPress={this.userLogin.bind(this)}>
                     <Text style={styles.buttonText}>Login</Text>
                 </TouchableOpacity>

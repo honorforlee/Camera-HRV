@@ -159,27 +159,27 @@ RCT_EXPORT_METHOD(start)
   [_captureSession addInput:videoDeviceInput];
   
   // added by babak to select highest frame rate:
-//  AVCaptureDeviceFormat *bestFormat = nil;
-//  AVFrameRateRange *bestFrameRateRange = nil;
-//  for ( AVCaptureDeviceFormat *format in [_videoDevice formats] ) {
-//    NSLog(@"~~~~~~~~~~~~~~");
-//    for ( AVFrameRateRange *range in format.videoSupportedFrameRateRanges ) {
-//      if ( range.maxFrameRate > bestFrameRateRange.maxFrameRate ) {
-//        bestFormat = format;
-//        bestFrameRateRange = range;
-//        NSLog(@"--- Switching to frame rate  : %f, %f\n",range.minFrameRate,range.maxFrameRate);
-//      }
-//    }
-//  }
-//  if ( bestFormat ) {
-//    if ( [_videoDevice lockForConfiguration:NULL] == YES ) {
-//      _videoDevice.activeFormat = bestFormat;
-//      _videoDevice.activeVideoMinFrameDuration = bestFrameRateRange.minFrameDuration;
-//      _videoDevice.activeVideoMaxFrameDuration = bestFrameRateRange.minFrameDuration;
-//      NSLog(@"--- Selected as highest framerate  : %lld, %d\n",bestFrameRateRange.minFrameDuration.value,bestFrameRateRange.minFrameDuration.timescale);
-//      [_videoDevice unlockForConfiguration];
-//    }
-//  }
+  AVCaptureDeviceFormat *bestFormat = nil;
+  AVFrameRateRange *bestFrameRateRange = nil;
+  for ( AVCaptureDeviceFormat *format in [_videoDevice formats] ) {
+    NSLog(@"~~~~~~~~~~~~~~");
+    for ( AVFrameRateRange *range in format.videoSupportedFrameRateRanges ) {
+      if ( range.maxFrameRate == 60 ) {
+        bestFormat = format;
+        bestFrameRateRange = range;
+        NSLog(@"--- Switching to frame rate  : %f, %f\n",range.minFrameRate,range.maxFrameRate);
+      }
+    }
+  }
+  if ( bestFormat ) {
+    if ( [_videoDevice lockForConfiguration:NULL] == YES ) {
+      _videoDevice.activeFormat = bestFormat;
+      _videoDevice.activeVideoMinFrameDuration = bestFrameRateRange.minFrameDuration;
+      _videoDevice.activeVideoMaxFrameDuration = bestFrameRateRange.minFrameDuration;
+      NSLog(@"--- Selected as highest framerate  : %lld, %d\n",bestFrameRateRange.minFrameDuration.value,bestFrameRateRange.minFrameDuration.timescale);
+      [_videoDevice unlockForConfiguration];
+    }
+  }
 
   NSLog(@"Semi Final 3 spec:: %lld, %d\n", _videoDevice.activeVideoMinFrameDuration.value, _videoDevice.activeVideoMinFrameDuration.timescale);
   
@@ -201,6 +201,8 @@ RCT_EXPORT_METHOD(start)
   // Get a reference to the image within the sample buffer.
   // Not owned by captureOutput
   CVImageBufferRef imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
+  
+  // Lock the buffer so that it can be accessed with the CPU
   CVPixelBufferLockBaseAddress(imageBuffer, kCVPixelBufferLock_ReadOnly);
   
   size_t width  = CVPixelBufferGetWidth(imageBuffer);
@@ -222,131 +224,60 @@ RCT_EXPORT_METHOD(start)
   }
   size_t bytes_per_pixel = bpp / bpc;
   
+  // Get the base address and access the pixels directly
   unsigned char *rawData = CVPixelBufferGetBaseAddress(imageBuffer);
   NSUInteger bytesPerPixel = bytes_per_pixel;
 
   int x = 0;
   int y = 0;
-  int total_red = 0;
-  int total_green = 0;
-  int total_blue = 0;
+  uint64_t totalRed = 0;
+  uint64_t totalGreen = 0;
+  uint64_t totalBlue = 0;
   //int total_alpha = 0;
-  int brightness = 0;
   
   // NSLog(@"width: %d, height: %d, bytesperow: %d, bytesperpixel: %d\n",width,height,bytesPerRow,bytesPerPixel);
   
-  for (int n = 0; n<(width*height); n+=50){
+  const int stepSize = 25;
+  for (int n = 0; n < (width * height); n += stepSize){
 
     unsigned long index = (bytesPerRow * y) + x * bytesPerPixel;
     // Image stored in BGRA
-    int blue  = rawData[index];
-    int green = rawData[index + 1];
-    int red   = rawData[index + 2];
+    unsigned int blue  = rawData[index];
+    unsigned int green = rawData[index + 1];
+    unsigned int red   = rawData[index + 2];
     //int alpha = rawData[index + 3];
 
-    total_red += red;
-    total_green += green;
-    total_blue += blue;
+    totalRed += red;
+    totalGreen += green;
+    totalBlue += blue;
+    
+    // Ensure that x resets to zero after a full line has been examined
+    x = (x + stepSize) % width;
 
-    /* NSArray * a = [NSArray arrayWithObjects:[NSString stringWithFormat:@"%i",red],[NSString stringWithFormat:@"%i",green],[NSString stringWithFormat:@"%i",blue],[NSString stringWithFormat:@"%i",alpha], nil];
-     [colours addObject:a];
-     */
-    x+=50;
-    if (x==width){
-      x=0;
+    // If at start of new line, increase y accordingly
+    if (x == 0) {
       y++;
     }
   }
+  // Done with computation, release buffer
   CVPixelBufferUnlockBaseAddress(imageBuffer, kCVPixelBufferLock_ReadOnly);
   
-  // TODO(Tyler): Check for null as the returned value from malloc
-//  float *redVector = malloc(numPixels * sizeof(float32_t));
-//  float *greenVector = malloc(numPixels * sizeof(float32_t));
-//  float *blueVector = malloc(numPixels * sizeof(float32_t));
 
+  // Take avg * 10 by dividing brightness by 1/10 the number of pixels examined
+  const int scalingFactor = 10;
+  totalRed /= (width*height/(stepSize * scalingFactor));
+  totalGreen /= (width*height/(stepSize * scalingFactor));
+  totalBlue /= (width*height/(stepSize * scalingFactor));
   
-  // Convert image to floats so that accelerate may be used
-//  vDSP_vfltu8(rawData, 4, redVector, 1, numPixels);
-//  vDSP_vfltu8(rawData + 1, 4, greenVector, 1, numPixels);
-//  vDSP_vfltu8(rawData + 2, 4, blueVector, 1, numPixels);
-
-  
-  total_red /= (width*height/500);
-  total_green /= (width*height/500);
-  total_blue /= (width*height/500);
-  
-//  float avgRed;
-//  float avgBlue;
-//  float avgGreen;
-  
-  // Find average of each color in the image
-//  vDSP_meamgv(redVector, 1, &avgRed, 1);
-//  vDSP_meamgv(blueVector, 1, &avgBlue, 1);
-//  vDSP_meamgv(greenVector, 1, &avgGreen, 1);
-
-  brightness = sqrt(total_red * total_red * 0.241+ total_blue * total_blue * 0.068 + total_green * total_green * 0.691);
-//  brightness = sqrt(pow(avgRed, 2.0) * 0.241 + pow(avgBlue, 2.0) * 0.068 + pow(avgGreen, 2.0) * 0.691);
-  
-//  free(redVector);
-//  free(blueVector);
-//  free(greenVector);
-
+  unsigned int brightness = sqrt(totalRed * totalRed * 0.241 + totalBlue * totalBlue * 0.068 + totalGreen * totalGreen * 0.691);
 
   //NSLog(@"Total Red: %d\n",total_red);
   
-  NSString* str = [NSString stringWithFormat:@"%d",brightness];
+  // Max value for any pixel is 255 as it is represented as an 8 bit uint
+  NSString* str = [NSString stringWithFormat:@"%d",
+                   255 * scalingFactor - brightness];
+  
   [self sendEventWithName:@"sayHello" body:str];
-
-  
-  
-  //----------
-  // Image processing
-//  CIFilter * vignetteFilter = [CIFilter filterWithName:@"CIVignetteEffect"];
-//  [vignetteFilter setValue:sourceImage forKey:kCIInputImageKey];
-//  [vignetteFilter setValue:[CIVector vectorWithX:sourceExtent.size.width/2 Y:sourceExtent.size.height/2] forKey:kCIInputCenterKey];
-//  [vignetteFilter setValue:@(sourceExtent.size.width/2) forKey:kCIInputRadiusKey];
-//  CIImage *filteredImage = [vignetteFilter outputImage];
-//
-//  CIFilter *effectFilter = [CIFilter filterWithName:@"CIPhotoEffectInstant"];
-//  [effectFilter setValue:filteredImage forKey:kCIInputImageKey];
-//  filteredImage = [effectFilter outputImage];
-//
-//
-//  CGFloat sourceAspect = sourceExtent.size.width / sourceExtent.size.height;
-//  CGFloat previewAspect = _videoPreviewViewBounds.size.width  / _videoPreviewViewBounds.size.height;
-//
-//  // we want to maintain the aspect radio of the screen size, so we clip the video image
-//  CGRect drawRect = sourceExtent;
-//  if (sourceAspect > previewAspect)
-//  {
-//    // use full height of the video image, and center crop the width
-//    drawRect.origin.x += (drawRect.size.width - drawRect.size.height * previewAspect) / 2.0;
-//    drawRect.size.width = drawRect.size.height * previewAspect;
-//  }
-//  else
-//  {
-//    // use full width of the video image, and center crop the height
-//    drawRect.origin.y += (drawRect.size.height - drawRect.size.width / previewAspect) / 2.0;
-//    drawRect.size.height = drawRect.size.width / previewAspect;
-//  }
-//
-//  [_videoPreviewView bindDrawable];
-//
-//  if (_eaglContext != [EAGLContext currentContext])
-//    [EAGLContext setCurrentContext:_eaglContext];
-//
-//  // clear eagl view to grey
-//  glClearColor(0.5, 0.5, 0.5, 1.0);
-//  glClear(GL_COLOR_BUFFER_BIT);
-//
-//  // set the blend mode to "source over" so that CI will use that
-//  glEnable(GL_BLEND);
-//  glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-//
-//  if (filteredImage)
-//    [_ciContext drawImage:filteredImage inRect:_videoPreviewViewBounds fromRect:drawRect];
-//
-//  [_videoPreviewView display];
 }
 
 @end

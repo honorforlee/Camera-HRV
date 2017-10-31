@@ -22,7 +22,7 @@ var rr = [];
 var prev = 0;
 var cnt = 0;
 var window_idx = 0;
-const WINDOW_SIZE = 100;
+const WINDOW_SIZE = 200;
 const SAMPLING_FREQ = 25;
 
 
@@ -58,14 +58,23 @@ export default class HomePage extends Component {
         max_array: 100,
         indeterminate: true,
         hrvProgress: 0,
-        int_avg : 50
+        int_avg : 50,
+        frame_number : 0,
+        sigma : 0
+    }
+
+    shouldComponentUpdate(nextProps, nextState){
+        return nextState.frame_number == 0;
     }
 
     update(data){
         //console.log(chart2);
-        this.setState({rgb:data});
+        // this.setState({rgb:data});
+        this.setState((state) => ({frame_number:((state.frame_number + 1) % 5)}));
         signal.shift();
         // signal_ac.shift();
+
+        // Remove the first item in chart
         chart.shift();
         while(chart2.length >=1 ){
             if( chart2[0].time > 0 && chart2[0].time < chart[0].time){
@@ -95,7 +104,7 @@ export default class HomePage extends Component {
         //--------
 
 
-        chart.push({time: cnt, value: 2000-int_data}); 
+        chart.push({time: cnt, value: int_data});
         // signal_ac.push(remove_dc);
         signal.push([cnt,int_data]);
         this.state.signal_avg = this.state.signal_avg * 0.9 + parseInt(data) * 0.1;
@@ -104,14 +113,47 @@ export default class HomePage extends Component {
         if(window_idx==WINDOW_SIZE-20){
             window_idx = 0;
             this.peakDetection();
+
+            // Calculate average and std dev
+            this.calcWindowStats();
+
             //alert(chart[0].time);
         }
         //this.state.max_array = Math.max.apply(null,signal_ac);
     }
 
+    /**
+     * Calculates the average brightness and standard deviation for the
+     * current window.
+     */
+    calcWindowStats(){
+        var sum = 0;
+
+        for (var i = 0; i < chart.length; i++) {
+            sum += chart[i].value;
+        }
+
+        var averageBrightness = sum / chart.length;
+        this.setState({int_avg : Math.floor(averageBrightness)});
+
+        var sumOfSquaredDifferences = 0;
+
+        for (var i = 0; i < chart.length; i++) {
+            currBrightness = chart[i].value;
+            difference = Math.abs(currBrightness - averageBrightness);
+            sumOfSquaredDifferences += Math.pow(difference, 2);
+        }
+
+        var avgSquaredDifference = sumOfSquaredDifferences / chart.length;
+        standardDeviation = Math.sqrt(avgSquaredDifference);
+        this.setState({sigma : Math.ceil(standardDeviation)});
+        this.setState({rgb:Math.ceil(standardDeviation).toString()})
+    }
+
+    /**
+     * Finds peaks in the current window.
+     */
     peakDetection(){
-
-
         var up = false;
         var upcounter = 0;
         var downcounter = 0;
@@ -224,6 +266,7 @@ export default class HomePage extends Component {
 
         rmssd *= 1000/SAMPLING_FREQ;
         this.setState({hrv:Math.floor(rmssd),indeterminate:true});
+        this.setState({frame_number: 0});
         rr = [];
         alert(rmssd);
         clearInterval(this._interval);
@@ -242,6 +285,7 @@ export default class HomePage extends Component {
         setTimeout(() => this.calculateHRV(), 60000);
         this._interval = setInterval(() => this.updateProgress(), 3000);
     }
+
     updateProgress(){
         this.setState({hrvProgress:this.state.hrvProgress+0.05});
     }
@@ -294,7 +338,7 @@ export default class HomePage extends Component {
                                             parent: {border: "1px solid #ccc"},
                                             data: { stroke: "#c43a31", strokeWidth: 2 }
                                         }}
-                                        domain={{y: [this.state.int_avg-70, this.state.int_avg+70]}}
+                                        domain={{y: [this.state.int_avg - 3 * this.state.sigma, this.state.int_avg + 3 * this.state.sigma], x: [chart[0].time, chart[WINDOW_SIZE-1].time]}}
                                         data={chart}
                                         x="time"
                                         y="value" />
@@ -302,8 +346,8 @@ export default class HomePage extends Component {
                                  <VictoryScatter
                                         style={{ data: { fill: "#c43a31" } }}
                                         size={7}
-                                        domain={{y: [this.state.int_avg-70, this.state.int_avg+70]}}
-                                        data={chart2}
+                                        domain={{y: [this.state.int_avg - 3 * this.state.sigma, this.state.int_avg + 3 * this.state.sigma], x: [chart[0].time, chart[WINDOW_SIZE-1].time]}}
+                                        data={{chart2}}
                                         x="time"
                                         y="value"  />
 
