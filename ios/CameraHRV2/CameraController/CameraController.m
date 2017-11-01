@@ -12,7 +12,6 @@
 #import <AVFoundation/AVFoundation.h>
 #import <CoreImage/CoreImage.h>
 #import <React/RCTUtils.h>
-#import <Accelerate/Accelerate.h>
 #include "math.h"
 #import <GLKit/GLKit.h>
 #import "AppDelegate.h"
@@ -212,7 +211,6 @@ RCT_EXPORT_METHOD(start)
   
   // For now, we assume each pixel is 8 bits, and 4 layers per pixel
   // This is because we set CVPixelFormatType_32BGRA up above
-
   size_t bpp = 32;
   size_t bpc = 8;
   //NSLog(@"bpc: %lu\n",bpc);
@@ -259,12 +257,12 @@ RCT_EXPORT_METHOD(start)
       y++;
     }
   }
+  
   // Done with computation, release buffer
   CVPixelBufferUnlockBaseAddress(imageBuffer, kCVPixelBufferLock_ReadOnly);
   
-
-  // Take avg * 10 by dividing brightness by 1/10 the number of pixels examined
-  const int scalingFactor = 10;
+  // Take avg * 100 by dividing brightness by 1/100 the number of pixels examined
+  const int scalingFactor = 100;
   totalRed /= (width*height/(stepSize * scalingFactor));
   totalGreen /= (width*height/(stepSize * scalingFactor));
   totalBlue /= (width*height/(stepSize * scalingFactor));

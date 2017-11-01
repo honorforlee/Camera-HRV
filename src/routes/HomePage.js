@@ -23,7 +23,8 @@ var prev = 0;
 var cnt = 0;
 var window_idx = 0;
 const WINDOW_SIZE = 200;
-const SAMPLING_FREQ = 25;
+// TODO(Tyler): This may be thirty if the device does not support 60 fps
+const SAMPLING_FREQ = 60;
 
 
 for(i=0; i<WINDOW_SIZE; i++){
@@ -63,13 +64,16 @@ export default class HomePage extends Component {
         sigma : 0
     }
 
+    /**
+     * Dictates when the UI should be redrawn. Returns true only after
+     * frame_number has cycled back to zero. Used to control refresh rate.
+     */
     shouldComponentUpdate(nextProps, nextState){
         return nextState.frame_number == 0;
     }
 
     update(data){
-        //console.log(chart2);
-        // this.setState({rgb:data});
+        this.setState({rgb:data});
         this.setState((state) => ({frame_number:((state.frame_number + 1) % 5)}));
         signal.shift();
         // signal_ac.shift();
@@ -139,15 +143,14 @@ export default class HomePage extends Component {
         var sumOfSquaredDifferences = 0;
 
         for (var i = 0; i < chart.length; i++) {
-            currBrightness = chart[i].value;
-            difference = Math.abs(currBrightness - averageBrightness);
+            var currBrightness = chart[i].value;
+            var difference = Math.abs(currBrightness - averageBrightness);
             sumOfSquaredDifferences += Math.pow(difference, 2);
         }
 
         var avgSquaredDifference = sumOfSquaredDifferences / chart.length;
-        standardDeviation = Math.sqrt(avgSquaredDifference);
+        var standardDeviation = Math.sqrt(avgSquaredDifference);
         this.setState({sigma : Math.ceil(standardDeviation)});
-        this.setState({rgb:Math.ceil(standardDeviation).toString()})
     }
 
     /**
@@ -347,7 +350,7 @@ export default class HomePage extends Component {
                                         style={{ data: { fill: "#c43a31" } }}
                                         size={7}
                                         domain={{y: [this.state.int_avg - 3 * this.state.sigma, this.state.int_avg + 3 * this.state.sigma], x: [chart[0].time, chart[WINDOW_SIZE-1].time]}}
-                                        data={{chart2}}
+                                        data={chart2}
                                         x="time"
                                         y="value"  />
 
