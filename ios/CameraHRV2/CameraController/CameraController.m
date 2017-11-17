@@ -194,6 +194,7 @@ RCT_EXPORT_METHOD(start)
 
 - (void)captureOutput:(AVCaptureOutput *)captureOutput didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer fromConnection:(AVCaptureConnection *)connection
 {
+  // Output the frame number
   NSLog(@"captureoutput\n %d",_testn);
   self.testn = self.testn + 1;
   
@@ -274,6 +275,8 @@ RCT_EXPORT_METHOD(start)
   // Max value for any pixel is 255 as it is represented as an 8 bit uint
   NSString* str = [NSString stringWithFormat:@"%d",
                    255 * scalingFactor - brightness];
+  // Output the brightness
+  NSLog(@"captureoutput\n %d", 255 * scalingFactor - brightness);
   
   [self sendEventWithName:@"sayHello" body:str];
 }

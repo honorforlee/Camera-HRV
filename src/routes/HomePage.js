@@ -5,6 +5,7 @@ import { VictoryAxis, VictoryArea, VictoryBar, VictoryLine, VictoryScatter, Vict
 import Button from 'react-native-button'
 import ProgressBar from 'react-native-progress/Circle'
 import {Actions} from 'react-native-router-flux';
+import io from 'socket.io-client';
 
 //import TransactionVolumeGraph from './TransactionVolumeGraph';
 
@@ -13,8 +14,12 @@ import {Actions} from 'react-native-router-flux';
 //import { Surface } from "gl-react-native";
 //import Saturate from './Saturate';
 
+// Sample period in seconds
+const TEST_LENGTH = 60.0;
 
 var signal = [];
+// Full signal from start to finish
+var full_signal = [];
 var signal_ac = [];
 var chart = [];
 var chart2 = [];
@@ -22,9 +27,13 @@ var rr = [];
 var prev = 0;
 var cnt = 0;
 var window_idx = 0;
+// Counts the number of frames
+var total_frames = 0;
 const WINDOW_SIZE = 200;
 // TODO(Tyler): This may be thirty if the device does not support 60 fps
-const SAMPLING_FREQ = 60;
+// Tentatively 60 during the recording phase, updated to real value for
+// calculation of HRV
+var SAMPLING_FREQ = 60;
 
 
 for(i=0; i<WINDOW_SIZE; i++){
@@ -41,10 +50,6 @@ export default class HomePage extends Component {
 
   constructor(props) {
     super(props);
-
-    // CameraController.start();
-    // CameraController.turnTorchOn(true);
-
   }
 
     state = {
@@ -53,7 +58,7 @@ export default class HomePage extends Component {
         isLoggedIn: false,
         path: 'https://facebook.github.io/react/img/logo_og.png',
         rgb: '...',
-        hrv: 0,
+        hrv: '...',
         torchMode: null,
         signal_avg: 0,
         max_array: 100,
@@ -73,6 +78,8 @@ export default class HomePage extends Component {
     }
 
     update(data){
+        // Log that another frame has been received
+        total_frames++;
         this.setState({rgb:data});
         this.setState((state) => ({frame_number:((state.frame_number + 1) % 5)}));
         signal.shift();
@@ -111,16 +118,18 @@ export default class HomePage extends Component {
         chart.push({time: cnt, value: int_data});
         // signal_ac.push(remove_dc);
         signal.push([cnt,int_data]);
+        full_signal.push(int_data);
         this.state.signal_avg = this.state.signal_avg * 0.9 + parseInt(data) * 0.1;
 
 
-        if(window_idx==WINDOW_SIZE-20){
+        if(window_idx == WINDOW_SIZE - 100){
             window_idx = 0;
-            this.peakDetection();
 
             // Calculate average and std dev
+            // Must run before peakDetection as peakDetection relies on the avg
             this.calcWindowStats();
 
+            this.peakDetection();
             //alert(chart[0].time);
         }
         //this.state.max_array = Math.max.apply(null,signal_ac);
@@ -157,16 +166,24 @@ export default class HomePage extends Component {
      * Finds peaks in the current window.
      */
     peakDetection(){
+        const MAX_BPM = 150;
+        const MAX_BPS = MAX_BPM / 60;
+        // Min number of samples between peaks
+        const MIN_INTERPEAK_DISTANCE = SAMPLING_FREQ / MAX_BPS;
+
         var up = false;
         var upcounter = 0;
         var downcounter = 0;
         var peak_idx = 0;
         var peak_val = 0;;
         var avg = 0;
-        for(i=0; i<WINDOW_SIZE-1 ;i++){
+        for(i=0; i<WINDOW_SIZE-1; i++){
             avg += chart[i].value;
+
+            next_higher = chart[i + 1].value - chart[i].value >= 5;
+            next_lower = !next_higher;
             if(up){
-                if(chart[i+1].value > chart[i].value){
+                if(next_higher){
                     console.log("Up:up, index: ",i," ,Value: ",chart[i].value ,"\n");
 
                     if(chart[i+1].value > peak_val){
@@ -174,7 +191,7 @@ export default class HomePage extends Component {
                         peak_val = chart[i+1].value;
                     }
                 }
-                else if(chart[i+1].value < chart[i].value){
+                else if(next_lower){
                     console.log("Up:Down, index: ",i," ,Value: ",chart[i].value ,"\n");
                     downcounter += 1;
                 }
@@ -183,27 +200,34 @@ export default class HomePage extends Component {
                     up = false;
                     console.log("Found Peak going down, index: ",i," ,Value: ",chart[i].value ,"\n");
                     if(peak_val > this.state.int_avg){
-                        chart2.push({time:chart[peak_idx].time,value:chart[peak_idx].value});
-
-                        // remove duplicates:
+                        // If this isn't the first peak
                         if(rr.length != 0){
+                            // remove duplicates:
                             if(chart[peak_idx].time <= rr[rr.length-1].time)
                                 {
                                     peak_val = 0;
                                     continue;
                                 }
+                            // Ignore this peak if it is too close to the prev
+                            if (Math.abs(chart[peak_idx].time - rr[rr.length - 1].time) < MIN_INTERPEAK_DISTANCE)
+                                {
+                                    peak_idx = rr[rr.length - 1].time;
+                                    peak_val = 0;
+                                    continue;
+                                }
                         }
                         rr.push({time:chart[peak_idx].time,value:chart[peak_idx].value});
+                        chart2.push({time:chart[peak_idx].time,value:chart[peak_idx].value});
                         peak_val = 0;
                     }
                 }
             }
             else{
-                if(chart[i+1].value > chart[i].value){
+                if(next_higher){
                     console.log("Down:Up, index: ",i," ,Value: ",chart[i].value ,"\n");
                     upcounter +=1 ;
                 }
-                else if(chart[i+1].value < chart[i].value){
+                else if(next_lower){
                     console.log("Down:Down, index: ",i," ,Value: ",chart[i].value ,"\n");
                     upcounter -= 0;
                 }
@@ -218,7 +242,6 @@ export default class HomePage extends Component {
         }
 
         avg = avg / WINDOW_SIZE-1;
-        this.setState({int_avg:Math.floor(avg)});
         console.log("chart2: ",chart2);
     }
 
@@ -240,6 +263,9 @@ export default class HomePage extends Component {
     }
 
     calculateHRV(){
+        // Calculate the true sampling SAMPLING_FREQ (Frames / second)
+        SAMPLING_FREQ = total_frames / TEST_LENGTH;
+
         sum_rr = 0;
         rmssd = 0;
         rr_cnt = 0;
@@ -252,26 +278,52 @@ export default class HomePage extends Component {
 
         var rr_lower_thresh = 0.7;
         var rr_upper_thresh = 1.3;
+        var removed_count = 0;
         for(i=1 ; i<rr.length-1 ; i++){
             // RR correction
             if(Math.abs(rr[i].time - rr[i-1].time) < rr_lower_thresh*avg_rr || Math.abs(rr[i+1].time - rr[i].time) < rr_lower_thresh*avg_rr || Math.abs(rr[i].time - rr[i-1].time) > rr_upper_thresh*avg_rr || Math.abs(rr[i+1].time - rr[i].time) > rr_upper_thresh*avg_rr)
-                continue;
-            else{
+                {
+                    removed_count = removed_count + 1;
+                    continue;
+                }
+            else {
                 sum_rr += Math.pow((Math.abs(rr[i+1].time - rr[i].time)-Math.abs(rr[i].time - rr[i-1].time)),2);
                 rr_cnt += 1;
             }
         }
+        // alert("Had this many peaks: " + rr.length);
+        // alert("really removed: " + removed_count);
         alert("removed "+((rr.length-2)-rr_cnt)+" avg: "+(avg_rr * 1000/SAMPLING_FREQ));
-        if(rr_cnt)
-            rmssd = Math.sqrt(sum_rr/rr_cnt);
-        else
-            rmssd = 0;
 
-        rmssd *= 1000/SAMPLING_FREQ;
-        this.setState({hrv:Math.floor(rmssd),indeterminate:true});
+        if(rr_cnt) {
+            rmssd = Math.sqrt(sum_rr/rr_cnt);
+            alert('rmssd before multiplying: ' + rmssd);
+        } else {
+            alert('No rrs!');
+            rmssd = 0;
+        }
+
+        rmssd *= 1000.0 / SAMPLING_FREQ;
+        this.setState({hrv:'HRV: ' + Math.floor(rmssd),indeterminate:true});
+        // Set frame_number to zero so that it will draw
         this.setState({frame_number: 0});
         rr = [];
-        alert(rmssd);
+
+        console.log('Opening socket to server');
+        const socket = io('http://er-lab.cs.ucla.edu/', { transports: ['websocket'] });
+
+        socket.on('connect_error', (error) => {
+            console.log('Error sending data to server' + error);
+            alert('Error sending data to server' + error);
+        });
+
+        socket.send({type: 'hrv',
+                   firstname: this.props.firstname,
+                   lastname: this.props.lastname,
+                   team: this.props.team,
+                   timestamp: Math.round(Date.now() / 1000),  // We want time in seconds
+                   data: {hrv: rmssd, pleth: full_signal}});
+
         clearInterval(this._interval);
         CameraController.turnTorchOn(false);
         this.listener.remove();
@@ -280,12 +332,14 @@ export default class HomePage extends Component {
     }
 
     start() {
+
+
         rr = [];
         this.listener = myModuleEvt.addListener('sayHello', (data) => this.update(data));
         CameraController.start();
         CameraController.turnTorchOn(true);
-        this.setState({indeterminate:false,hrvProgress:0});
-        setTimeout(() => this.calculateHRV(), 60000);
+        this.setState({indeterminate:false,hrvProgress:0, hrv: 'HRV: calculating'});
+        setTimeout(() => this.calculateHRV(), 1000 * TEST_LENGTH);
         this._interval = setInterval(() => this.updateProgress(), 3000);
     }
 

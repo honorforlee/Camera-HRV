@@ -11,8 +11,10 @@
 		"react-native": "0.47.2",
 		"react-native-button": "^2.1.0",
 		"react-native-progress": "^3.4.0",
-		"react-native-router-flux": "^4.0.0-beta.21",
-		"react-native-svg": "^5.4.1",
+		"react-native-router-flux": "^4.0.0-beta.24",
+		"react-native-svg": "^5.5.1",
+		"socket.io": "^2.0.4",
+		"socket.io-client": "^2.0.4",
 		"victory-native": "^0.14.0"
 	},
 	"devDependencies": {

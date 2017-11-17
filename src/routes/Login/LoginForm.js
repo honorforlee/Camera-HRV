@@ -23,6 +23,7 @@ export default class LoginForm extends Component{
     userLogin() {
         if (!this.state.email || !this.state.password) return;
         // TODO: localhost doesn't work because the app is running inside an emulator. Get the IP address with ifconfig.
+        // Actions.HomePage();
         fetch('http://er-lab.cs.ucla.edu/mobile/login', {
             method: 'POST',
             headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
@@ -33,18 +34,25 @@ export default class LoginForm extends Component{
         })
         .then((response) => response.json())
         .then((responseData) => {
-            if(responseData.success){
+            if(responseData.success && responseData.role == 'athlete'){
                 // TODO : For server middleware ('hasAccess')
                 //this.saveItem('id_token', responseData.token);
-                Actions.HomePage();
+                // alert(responseData.firstname);
+                Actions.HomePage({firstname: responseData.firstname,
+                                  lastname: responseData.lastname,
+                                  team: responseData.team});
             }
+            // else if (response.role == 'coach') {
+            //     alert('App only usable by athletes.');
+            //     Actions.Login();
+            // }
             else{
                 alert('Wrong username/password');
                 Actions.Login();
             }
 
         })
-        .done();
+        // .done();
     }
 
 
