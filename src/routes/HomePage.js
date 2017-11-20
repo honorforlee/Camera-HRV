@@ -16,6 +16,8 @@ import io from 'socket.io-client';
 
 // Sample period in seconds
 const TEST_LENGTH = 60.0;
+// Interval for progress bar updates, in seconds
+const PROGRESS_BAR_INTERVAL = 3.0;
 
 var signal = [];
 // Full signal from start to finish
@@ -27,7 +29,7 @@ var rr = [];
 var prev = 0;
 var cnt = 0;
 var window_idx = 0;
-// Counts the number of frames
+// Counts the total number of frames collected during the test
 var total_frames = 0;
 const WINDOW_SIZE = 200;
 // TODO(Tyler): This may be thirty if the device does not support 60 fps
@@ -66,7 +68,7 @@ export default class HomePage extends Component {
         hrvProgress: 0,
         int_avg : 50,
         frame_number : 0,
-        sigma : 0
+        sigma : 0  // Standard deviation of the signal in the current window
     }
 
     /**
@@ -83,7 +85,6 @@ export default class HomePage extends Component {
         this.setState({rgb:data});
         this.setState((state) => ({frame_number:((state.frame_number + 1) % 5)}));
         signal.shift();
-        // signal_ac.shift();
 
         // Remove the first item in chart
         chart.shift();
@@ -96,14 +97,12 @@ export default class HomePage extends Component {
         }
 
         if(chart2.length == 0){
-            //console.log("chart length: %d",chart.length);
             chart2.push({time:chart[1].time,value:-10});
         }
 
         cnt += 1;
         window_idx += 1;
         var int_data = parseInt(data);
-        // var remove_dc = int_data-this.state.signal_avg/2;
 
         var new_val = Math.abs(int_data - prev);
         prev = int_data;
@@ -111,18 +110,16 @@ export default class HomePage extends Component {
         var rms = Math.pow(signal[WINDOW_SIZE-2][1]-signal[WINDOW_SIZE-3][1],2) + Math.pow(signal[WINDOW_SIZE-3][1]-signal[WINDOW_SIZE-4][1],2) + Math.pow(signal[WINDOW_SIZE-4][1]-signal[WINDOW_SIZE-5][1],2);
         rms = Math.sqrt(rms);
         rms /= 3;
-        //new_val = rms;
         //--------
 
 
         chart.push({time: cnt, value: int_data});
-        // signal_ac.push(remove_dc);
         signal.push([cnt,int_data]);
         full_signal.push(int_data);
         this.state.signal_avg = this.state.signal_avg * 0.9 + parseInt(data) * 0.1;
 
 
-        if(window_idx == WINDOW_SIZE - 100){
+        if(window_idx == WINDOW_SIZE - 140){
             window_idx = 0;
 
             // Calculate average and std dev
@@ -130,9 +127,7 @@ export default class HomePage extends Component {
             this.calcWindowStats();
 
             this.peakDetection();
-            //alert(chart[0].time);
         }
-        //this.state.max_array = Math.max.apply(null,signal_ac);
     }
 
     /**
@@ -199,10 +194,11 @@ export default class HomePage extends Component {
                     upcounter = 0;
                     up = false;
                     console.log("Found Peak going down, index: ",i," ,Value: ",chart[i].value ,"\n");
-                    if(peak_val > this.state.int_avg){
+                    // if(peak_val > this.state.int_avg){
                         // If this isn't the first peak
                         if(rr.length != 0){
                             // remove duplicates:
+                            // alert(rr['l'].time);
                             if(chart[peak_idx].time <= rr[rr.length-1].time)
                                 {
                                     peak_val = 0;
@@ -211,7 +207,6 @@ export default class HomePage extends Component {
                             // Ignore this peak if it is too close to the prev
                             if (Math.abs(chart[peak_idx].time - rr[rr.length - 1].time) < MIN_INTERPEAK_DISTANCE)
                                 {
-                                    peak_idx = rr[rr.length - 1].time;
                                     peak_val = 0;
                                     continue;
                                 }
@@ -219,7 +214,7 @@ export default class HomePage extends Component {
                         rr.push({time:chart[peak_idx].time,value:chart[peak_idx].value});
                         chart2.push({time:chart[peak_idx].time,value:chart[peak_idx].value});
                         peak_val = 0;
-                    }
+                    // }
                 }
             }
             else{
@@ -241,7 +236,6 @@ export default class HomePage extends Component {
             }
         }
 
-        avg = avg / WINDOW_SIZE-1;
         console.log("chart2: ",chart2);
     }
 
@@ -263,7 +257,7 @@ export default class HomePage extends Component {
     }
 
     calculateHRV(){
-        // Calculate the true sampling SAMPLING_FREQ (Frames / second)
+        // Calculate the true SAMPLING_FREQ (Frames / second)
         SAMPLING_FREQ = total_frames / TEST_LENGTH;
 
         sum_rr = 0;
@@ -291,13 +285,13 @@ export default class HomePage extends Component {
                 rr_cnt += 1;
             }
         }
-        // alert("Had this many peaks: " + rr.length);
-        // alert("really removed: " + removed_count);
-        alert("removed "+((rr.length-2)-rr_cnt)+" avg: "+(avg_rr * 1000/SAMPLING_FREQ));
+        console.log("Had this many peaks: " + rr.length);
+        console.log("really removed: " + removed_count);
+        // alert("removed "+((rr.length-2)-rr_cnt)+" avg: "+(avg_rr * 1000/SAMPLING_FREQ));
 
         if(rr_cnt) {
             rmssd = Math.sqrt(sum_rr/rr_cnt);
-            alert('rmssd before multiplying: ' + rmssd);
+            // alert('rmssd before multiplying: ' + rmssd);
         } else {
             alert('No rrs!');
             rmssd = 0;
@@ -308,6 +302,8 @@ export default class HomePage extends Component {
         // Set frame_number to zero so that it will draw
         this.setState({frame_number: 0});
         rr = [];
+
+        alert('Measurement complete!');
 
         console.log('Opening socket to server');
         const socket = io('http://er-lab.cs.ucla.edu/', { transports: ['websocket'] });
@@ -331,20 +327,26 @@ export default class HomePage extends Component {
 
     }
 
+    // TODO(Tyler): Modify this method so that the button  will stop
+    // and then restart a test.
+    /**
+     * Starts the test running once the button is pressed.
+     */
     start() {
-
-
         rr = [];
         this.listener = myModuleEvt.addListener('sayHello', (data) => this.update(data));
         CameraController.start();
         CameraController.turnTorchOn(true);
         this.setState({indeterminate:false,hrvProgress:0, hrv: 'HRV: calculating'});
         setTimeout(() => this.calculateHRV(), 1000 * TEST_LENGTH);
-        this._interval = setInterval(() => this.updateProgress(), 3000);
+        this._interval = setInterval(() => this.updateProgress(), PROGRESS_BAR_INTERVAL * 1000);
     }
 
     updateProgress(){
-        this.setState({hrvProgress:this.state.hrvProgress+0.05});
+        // There are TEST_LENGTH / PROGRESS_BAR_INTERVAL ticks
+        // After all ticks are complete, bar must be completely progressed
+        this.setState({hrvProgress: this.state.hrvProgress
+                        + (1.0 / (TEST_LENGTH / PROGRESS_BAR_INTERVAL))});
     }
 
     onComponentWillUnmount() {

@@ -36,23 +36,21 @@ export default class LoginForm extends Component{
         .then((responseData) => {
             if(responseData.success && responseData.role == 'athlete'){
                 // TODO : For server middleware ('hasAccess')
-                //this.saveItem('id_token', responseData.token);
-                // alert(responseData.firstname);
+                // Transition to the homepage, passing along necessary data
                 Actions.HomePage({firstname: responseData.firstname,
                                   lastname: responseData.lastname,
                                   team: responseData.team});
             }
-            // else if (response.role == 'coach') {
-            //     alert('App only usable by athletes.');
-            //     Actions.Login();
-            // }
+            else if (response.role == 'coach') {
+                alert('App only usable by athletes.');
+                Actions.Login();
+            }
             else{
                 alert('Wrong username/password');
                 Actions.Login();
             }
-
         })
-        // .done();
+        .done();
     }
 
 
@@ -65,6 +63,7 @@ export default class LoginForm extends Component{
                     onChangeText={(email) => this.setState({email})}
                     onSubmitEditing = {() => this.passwordInput.focus()}
                     autoCapitalize="none"
+                    autocorrect={false}
                     style = {styles.input} />
 
                 <TextInput
@@ -74,6 +73,7 @@ export default class LoginForm extends Component{
                     onChangeText={(password) => this.setState({password})}
                     ref = {(input) => this.passwordInput = input}
                     autoCapitalize="none"
+                    autocorrect={false}
                     style = {styles.input} />
 
                 <TouchableOpacity style={styles.buttonContainer} onPress={this.userLogin.bind(this)}>
