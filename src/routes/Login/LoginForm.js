@@ -41,7 +41,7 @@ export default class LoginForm extends Component{
                                   lastname: responseData.lastname,
                                   team: responseData.team});
             }
-            else if (response.role == 'coach') {
+            else if (responseData.role == 'coach') {
                 alert('App only usable by athletes.');
                 Actions.Login();
             }
@@ -63,7 +63,7 @@ export default class LoginForm extends Component{
                     onChangeText={(email) => this.setState({email})}
                     onSubmitEditing = {() => this.passwordInput.focus()}
                     autoCapitalize="none"
-                    autocorrect={false}
+                    autoCorrect={false}
                     style = {styles.input} />
 
                 <TextInput
@@ -73,7 +73,7 @@ export default class LoginForm extends Component{
                     onChangeText={(password) => this.setState({password})}
                     ref = {(input) => this.passwordInput = input}
                     autoCapitalize="none"
-                    autocorrect={false}
+                    autoCorrect={false}
                     style = {styles.input} />
 
                 <TouchableOpacity style={styles.buttonContainer} onPress={this.userLogin.bind(this)}>

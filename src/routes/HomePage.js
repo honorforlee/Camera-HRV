@@ -7,31 +7,43 @@ import ProgressBar from 'react-native-progress/Circle'
 import {Actions} from 'react-native-router-flux';
 import io from 'socket.io-client';
 
-//import TransactionVolumeGraph from './TransactionVolumeGraph';
-
-//import PixelColor from 'react-native-pixel-color';
-
-//import { Surface } from "gl-react-native";
-//import Saturate from './Saturate';
-
 // Sample period in seconds
 const TEST_LENGTH = 60.0;
 // Interval for progress bar updates, in seconds
 const PROGRESS_BAR_INTERVAL = 3.0;
 
-var signal = [];
+// Whether to show raw data or to show idealized data
+var idealized_visuals = true;
+// Signal that is currently displayed
+var displayed_signal = [];
+// Peaks that are being displayed
+var displayed_peaks = [];
+// Signal that is about to be displayed
+var holding_signal = [];
+
+var perfect_peak = [0.0, 0.00295858, 0.00887574, 0.014792899, 0.023668639,
+    0.029585799, 0.047337278, 0.088757396, 0.118343195, 0.210059172,
+    0.417159763, 0.689349112, 0.914201183, 0.99704142, 0.940828402,
+    0.789940828, 0.615384615, 0.461538462, 0.346153846, 0.266272189,
+    0.233727811, 0.24852071, 0.289940828, 0.322485207, 0.325443787,
+    0.286982249, 0.224852071, 0.153846154, 0.085798817, 0.038461538,
+    0.01183432, 0.0];
+
 // Full signal from start to finish
 var full_signal = [];
-var signal_ac = [];
 var chart = [];
+var upper_y_limit = 0;
+var lower_y_limit = 0;
 var chart2 = [];
 var rr = [];
-var prev = 0;
+// The 'x' value of this frame. This Frame is the cnt'th frame received.
 var cnt = 0;
 var window_idx = 0;
+
 // Counts the total number of frames collected during the test
 var total_frames = 0;
 const WINDOW_SIZE = 200;
+
 // TODO(Tyler): This may be thirty if the device does not support 60 fps
 // Tentatively 60 during the recording phase, updated to real value for
 // calculation of HRV
@@ -40,8 +52,8 @@ var SAMPLING_FREQ = 60;
 
 for(i=0; i<WINDOW_SIZE; i++){
     chart.push({time: i, value: 0});
-    signal.push([0,0]);
-    signal_ac.push(0);
+    displayed_signal.push({time: 0, value: 0});
+    holding_signal.push({time: -WINDOW_SIZE + i, value: 0});
 }
 
 
@@ -57,7 +69,6 @@ export default class HomePage extends Component {
     state = {
         width: null,
         height: null,
-        isLoggedIn: false,
         path: 'https://facebook.github.io/react/img/logo_og.png',
         rgb: '...',
         hrv: '...',
@@ -84,77 +95,114 @@ export default class HomePage extends Component {
         total_frames++;
         this.setState({rgb:data});
         this.setState((state) => ({frame_number:((state.frame_number + 1) % 5)}));
-        signal.shift();
 
-        // Remove the first item in chart
-        chart.shift();
-        while(chart2.length >=1 ){
-            if( chart2[0].time > 0 && chart2[0].time < chart[0].time){
-                chart2.shift();
-            }
-            else
-                break;
-        }
-
-        if(chart2.length == 0){
-            chart2.push({time:chart[1].time,value:-10});
-        }
-
+        var int_data = parseInt(data);
         cnt += 1;
         window_idx += 1;
-        var int_data = parseInt(data);
 
-        var new_val = Math.abs(int_data - prev);
-        prev = int_data;
-        // New RMS alg:
-        var rms = Math.pow(signal[WINDOW_SIZE-2][1]-signal[WINDOW_SIZE-3][1],2) + Math.pow(signal[WINDOW_SIZE-3][1]-signal[WINDOW_SIZE-4][1],2) + Math.pow(signal[WINDOW_SIZE-4][1]-signal[WINDOW_SIZE-5][1],2);
-        rms = Math.sqrt(rms);
-        rms /= 3;
-        //--------
+        // Code to display the actual signal
+        if (!idealized_visuals) {
+            // Remove the first item in chart
+            chart.shift();
+            // Remove peaks from the scatter plot that are no longer visible
+            while(chart2.length >= 1 ){
+                if(chart2[0].time > 0 && chart2[0].time < chart[0].time){
+                    chart2.shift();
+                }
+                else
+                    break;
+            }
+
+            if(chart2.length == 0){
+                chart2.push({time:chart[1].time,value:-10});
+            }
+
+            chart.push({time: cnt, value: int_data});
+
+            displayed_signal = chart;
+            displayed_peaks = chart2;
+        } else {
+            // Display the idealized signal
+
+            // here we pop a data point from the holding signal and append
+            // to the display signal.
+
+            chart.shift();
+            chart.push({time: cnt, value: int_data});
+            displayed_peaks = chart2;
+
+            displayed_signal.shift();
+            var new_point = holding_signal.shift();
+            displayed_signal.push(new_point);
 
 
-        chart.push({time: cnt, value: int_data});
-        signal.push([cnt,int_data]);
+            // add a new point onto the back of the holding signal
+
+            // TODO(Tyler): Remove items from chart2 that are no longer visible
+
+            // Add new entry to holding signal only if it is not already
+            // at its ideal length
+            if (holding_signal.length < WINDOW_SIZE) {
+                // add window size to account for the part thats already filled
+                holding_signal.push({time: cnt, value: 0.001});
+            }
+        }
+
         full_signal.push(int_data);
-        this.state.signal_avg = this.state.signal_avg * 0.9 + parseInt(data) * 0.1;
-
 
         if(window_idx == WINDOW_SIZE - 140){
             window_idx = 0;
 
-            // Calculate average and std dev
-            // Must run before peakDetection as peakDetection relies on the avg
+            // Calculate upper and lower limits for graph y axis
             this.calcWindowStats();
 
+            // Detect peaks
             this.peakDetection();
         }
     }
 
     /**
      * Calculates the average brightness and standard deviation for the
-     * current window.
+     * current window. Uses this to set the viewing window
      */
     calcWindowStats(){
-        var sum = 0;
+        if (!idealized_visuals) {
+            var sum = 0;
 
-        for (var i = 0; i < chart.length; i++) {
-            sum += chart[i].value;
+            for (var i = 0; i < chart.length; i++) {
+                sum += chart[i].value;
+            }
+
+            var averageBrightness = sum / chart.length;
+            var int_avg = Math.floor(averageBrightness);
+
+            var sumOfSquaredDifferences = 0;
+
+            for (var i = 0; i < chart.length; i++) {
+                var currBrightness = chart[i].value;
+                var difference = Math.abs(currBrightness - averageBrightness);
+                sumOfSquaredDifferences += Math.pow(difference, 2);
+            }
+
+            var avgSquaredDifference = sumOfSquaredDifferences / chart.length;
+            var standardDeviation = Math.sqrt(avgSquaredDifference);
+            var sigma = Math.ceil(standardDeviation);
+
+            upper_y_limit = int_avg + 3 * sigma;
+            lower_y_limit = int_avg - 3 * sigma;
+
+        } else {
+            // If showing the idealized signal, the lower peak should be zero
+            // max should be a bit over the peak's value
+            var max = -1;
+            for (var i = 0; i < chart.length; i++) {
+                if (chart[i].value > max) {
+                    max = chart[i].value;
+                }
+            }
+            upper_y_limit = 1.1 * max;
+            lower_y_limit = 0;
         }
-
-        var averageBrightness = sum / chart.length;
-        this.setState({int_avg : Math.floor(averageBrightness)});
-
-        var sumOfSquaredDifferences = 0;
-
-        for (var i = 0; i < chart.length; i++) {
-            var currBrightness = chart[i].value;
-            var difference = Math.abs(currBrightness - averageBrightness);
-            sumOfSquaredDifferences += Math.pow(difference, 2);
-        }
-
-        var avgSquaredDifference = sumOfSquaredDifferences / chart.length;
-        var standardDeviation = Math.sqrt(avgSquaredDifference);
-        this.setState({sigma : Math.ceil(standardDeviation)});
     }
 
     /**
@@ -164,8 +212,12 @@ export default class HomePage extends Component {
         const MAX_BPM = 150;
         const MAX_BPS = MAX_BPM / 60;
         // Min number of samples between peaks
-        const MIN_INTERPEAK_DISTANCE = SAMPLING_FREQ / MAX_BPS;
+        // const MIN_INTERPEAK_DISTANCE = SAMPLING_FREQ / MAX_BPS;
 
+        // TODO(Tyler): Eventually change this to be the length of the
+        // perfect signal
+        const MIN_INTERPEAK_DISTANCE = perfect_peak.length;
+        // alert('starting peak detection');
         var up = false;
         var upcounter = 0;
         var downcounter = 0;
@@ -194,27 +246,75 @@ export default class HomePage extends Component {
                     upcounter = 0;
                     up = false;
                     console.log("Found Peak going down, index: ",i," ,Value: ",chart[i].value ,"\n");
-                    // if(peak_val > this.state.int_avg){
-                        // If this isn't the first peak
-                        if(rr.length != 0){
-                            // remove duplicates:
-                            // alert(rr['l'].time);
-                            if(chart[peak_idx].time <= rr[rr.length-1].time)
-                                {
-                                    peak_val = 0;
-                                    continue;
-                                }
-                            // Ignore this peak if it is too close to the prev
-                            if (Math.abs(chart[peak_idx].time - rr[rr.length - 1].time) < MIN_INTERPEAK_DISTANCE)
-                                {
-                                    peak_val = 0;
-                                    continue;
-                                }
+
+                    // If this isn't the first peak
+                    if(rr.length != 0){
+                        // remove duplicates:
+                        // alert(rr['l'].time);
+                        if(chart[peak_idx].time <= rr[rr.length-1].time)
+                            {
+                                peak_val = 0;
+                                continue;
+                            }
+                        // Ignore this peak if it is too close to the prev
+                        if (Math.abs(chart[peak_idx].time - rr[rr.length - 1].time) < MIN_INTERPEAK_DISTANCE)
+                            {
+                                peak_val = 0;
+                                continue;
+                            }
+                    }
+                    rr.push({time:chart[peak_idx].time,value:chart[peak_idx].value});
+
+                    if (idealized_visuals) {
+                        // alert('found a peak!');
+
+                        var peak_value = chart[peak_idx].value;
+                        // Must add window_size in order to account for the delay
+                        chart2.push({time:chart[peak_idx].time + 14, value:peak_value});
+                        // Now add the idealized peak into the holding signal
+
+                        // alert('looking for location match!');
+
+                        var found_match = false;
+                        for (i = 0; i < WINDOW_SIZE; i++) {
+                            if (holding_signal[i].time == chart[peak_idx].time) {
+                                found_match = true;
+                                break;
+                            }
                         }
-                        rr.push({time:chart[peak_idx].time,value:chart[peak_idx].value});
+                        if (!found_match) {
+                            alert('Match not found');
+                        }
+                        // alert('found match!');
+
+
+                        // i is now the index where the matching value resides
+                        var idealized_peak_index = 0;
+                        while (i < WINDOW_SIZE) {
+                            holding_signal[i].value = perfect_peak[idealized_peak_index]
+                                                        * peak_val;
+                            idealized_peak_index++;
+                            i++;
+                        }
+                        // alert('put in part of signal!');
+
+                        // if full signal hasn't yet been added
+                        var time_val = chart[peak_idx].time;
+                        while (idealized_peak_index < perfect_peak.length) {
+
+                            var push_val = perfect_peak[idealized_peak_index]
+                                            * peak_val;
+
+                            holding_signal.push(
+                                {time: time_val + idealized_peak_index,
+                                value: push_val});
+                            idealized_peak_index++;
+                        }
+                        // alert('finished peak detection!');
+                    } else {
                         chart2.push({time:chart[peak_idx].time,value:chart[peak_idx].value});
-                        peak_val = 0;
-                    // }
+                    }
+                    peak_val = 0;
                 }
             }
             else{
@@ -397,16 +497,16 @@ export default class HomePage extends Component {
                                             parent: {border: "1px solid #ccc"},
                                             data: { stroke: "#c43a31", strokeWidth: 2 }
                                         }}
-                                        domain={{y: [this.state.int_avg - 3 * this.state.sigma, this.state.int_avg + 3 * this.state.sigma], x: [chart[0].time, chart[WINDOW_SIZE-1].time]}}
-                                        data={chart}
+                                        domain={{y: [lower_y_limit, upper_y_limit], x: [displayed_signal[0].time, displayed_signal[WINDOW_SIZE-1].time]}}
+                                        data={displayed_signal}
                                         x="time"
                                         y="value" />
 
                                  <VictoryScatter
                                         style={{ data: { fill: "#c43a31" } }}
                                         size={7}
-                                        domain={{y: [this.state.int_avg - 3 * this.state.sigma, this.state.int_avg + 3 * this.state.sigma], x: [chart[0].time, chart[WINDOW_SIZE-1].time]}}
-                                        data={chart2}
+                                        domain={{y: [lower_y_limit, upper_y_limit], x: [displayed_signal[0].time, displayed_signal[WINDOW_SIZE-1].time]}}
+                                        data={displayed_peaks}
                                         x="time"
                                         y="value"  />
 
