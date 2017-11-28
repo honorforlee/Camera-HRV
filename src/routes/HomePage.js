@@ -52,7 +52,7 @@ var SAMPLING_FREQ = 60;
 
 for(i=0; i<WINDOW_SIZE; i++){
     chart.push({time: i, value: 0});
-    displayed_signal.push({time: 0, value: 0});
+    displayed_signal.push({time: -2 * WINDOW_SIZE + i, value: 0});
     holding_signal.push({time: -WINDOW_SIZE + i, value: 0});
 }
 
@@ -129,7 +129,6 @@ export default class HomePage extends Component {
 
             chart.shift();
             chart.push({time: cnt, value: int_data});
-            displayed_peaks = chart2;
 
             displayed_signal.shift();
             var new_point = holding_signal.shift();
@@ -138,13 +137,21 @@ export default class HomePage extends Component {
 
             // add a new point onto the back of the holding signal
 
-            // TODO(Tyler): Remove items from chart2 that are no longer visible
+            // Remove displayed peaks that are no longer visible
+            while(chart2.length >= 1 ){
+                if(chart2[0].time > 0 && chart2[0].time < displayed_signal[0].time) {
+                    chart2.shift();
+                }
+                else
+                    break;
+            }
+            displayed_peaks = chart2;
 
             // Add new entry to holding signal only if it is not already
             // at its ideal length
             if (holding_signal.length < WINDOW_SIZE) {
                 // add window size to account for the part thats already filled
-                holding_signal.push({time: cnt, value: 0.001});
+                holding_signal.push({time: cnt, value: 0});
             }
         }
 
@@ -167,6 +174,7 @@ export default class HomePage extends Component {
      */
     calcWindowStats(){
         if (!idealized_visuals) {
+            // Set range based on standard deviation
             var sum = 0;
 
             for (var i = 0; i < chart.length; i++) {
@@ -201,7 +209,7 @@ export default class HomePage extends Component {
                 }
             }
             upper_y_limit = 1.1 * max;
-            lower_y_limit = 0;
+            lower_y_limit = -2000;
         }
     }
 
@@ -214,8 +222,6 @@ export default class HomePage extends Component {
         // Min number of samples between peaks
         // const MIN_INTERPEAK_DISTANCE = SAMPLING_FREQ / MAX_BPS;
 
-        // TODO(Tyler): Eventually change this to be the length of the
-        // perfect signal
         const MIN_INTERPEAK_DISTANCE = perfect_peak.length;
         // alert('starting peak detection');
         var up = false;
@@ -263,18 +269,18 @@ export default class HomePage extends Component {
                                 continue;
                             }
                     }
+                    // Record the location of the peak for processing
                     rr.push({time:chart[peak_idx].time,value:chart[peak_idx].value});
 
                     if (idealized_visuals) {
-                        // alert('found a peak!');
-
                         var peak_value = chart[peak_idx].value;
                         // Must add window_size in order to account for the delay
-                        chart2.push({time:chart[peak_idx].time + 14, value:peak_value});
+                        chart2.push({time: chart[peak_idx].time + 14, value: peak_value});
                         // Now add the idealized peak into the holding signal
 
-                        // alert('looking for location match!');
 
+                        // Find where to insert the idealized signal in the
+                        // holding area
                         var found_match = false;
                         for (i = 0; i < WINDOW_SIZE; i++) {
                             if (holding_signal[i].time == chart[peak_idx].time) {
@@ -282,26 +288,24 @@ export default class HomePage extends Component {
                                 break;
                             }
                         }
-                        if (!found_match) {
-                            alert('Match not found');
-                        }
-                        // alert('found match!');
 
 
                         // i is now the index where the matching value resides
                         var idealized_peak_index = 0;
-                        while (i < WINDOW_SIZE) {
-                            holding_signal[i].value = perfect_peak[idealized_peak_index]
-                                                        * peak_val;
+                        while (i < WINDOW_SIZE &&
+                                idealized_peak_index< perfect_peak.length) {
+                            // insert the idealized peak into the signal
+                            holding_signal[i] = {time: holding_signal[i].time,
+                                 value: perfect_peak[idealized_peak_index]
+                                        * peak_val};
                             idealized_peak_index++;
                             i++;
                         }
-                        // alert('put in part of signal!');
 
-                        // if full signal hasn't yet been added
+                        // if full signal hasn't yet been added due to
+                        // peak overlapping end of window
                         var time_val = chart[peak_idx].time;
                         while (idealized_peak_index < perfect_peak.length) {
-
                             var push_val = perfect_peak[idealized_peak_index]
                                             * peak_val;
 
@@ -310,7 +314,6 @@ export default class HomePage extends Component {
                                 value: push_val});
                             idealized_peak_index++;
                         }
-                        // alert('finished peak detection!');
                     } else {
                         chart2.push({time:chart[peak_idx].time,value:chart[peak_idx].value});
                     }
