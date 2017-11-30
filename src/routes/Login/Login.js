@@ -6,17 +6,17 @@ import {Actions} from 'react-native-router-flux';
 export default class Login extends Component{
     render() {
         return(
-            <KeyboardAvoidingView behavior = "padding" style = {styles.container}>
+            <KeyboardAvoidingView behavior = 'padding' style = {styles.container}>
                 <View style = {styles.logoContainer}>
-                    <Image 
+                    <Image
                         style = {styles.logo}
                         source = {require('../../images/mascot2.png')}/>
                     <Text style = {styles.title}> Sport Analytics HRV </Text>
                 </View>
-                <View style = {styles.formContainer}>
+                <View>
                     <LoginForm />
                 </View>
-                
+
             </KeyboardAvoidingView>
 
         );
@@ -35,8 +35,8 @@ const styles = StyleSheet.create({
     },
     logo: {
         resizeMode: 'contain',
-        width : 200,
-        height : 200
+        width : 140,
+        height : 140
     },
     title:{
         color : '#FFF',
@@ -45,4 +45,4 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         fontSize: 20
     }
-})
+});

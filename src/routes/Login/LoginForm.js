@@ -24,12 +24,12 @@ export default class LoginForm extends Component{
         if (!this.state.email || !this.state.password) return;
         // TODO: localhost doesn't work because the app is running inside an emulator. Get the IP address with ifconfig.
         // Actions.HomePage();
-        fetch('http://er-lab.cs.ucla.edu/mobile/login', {
+        fetch('http://er-lab.cs.ucla.edu:443/mobile/login', {
             method: 'POST',
             headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 email: this.state.email,
-                password: this.state.password,
+                password: this.state.password
             })
         })
         .then((response) => response.json())
@@ -99,7 +99,6 @@ const styles = StyleSheet.create({
     },
     buttonText:{
         textAlign:'center',
-        fontWeight: '700',
-
+        fontWeight: '700'
     }
 })
