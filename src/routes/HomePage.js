@@ -7,22 +7,23 @@ import ProgressBar from 'react-native-progress/Circle'
 import {Actions} from 'react-native-router-flux';
 import io from 'socket.io-client';
 
-// Sample period in seconds
+// Test length in seconds
 const TEST_LENGTH = 60.0;
 // Interval for progress bar updates, in seconds
 const PROGRESS_BAR_INTERVAL = 1.0;
-// Run peak after this many samples
+// Run peak detection on this interval, in frames
 const PEAK_DETECTION_INTERVAL = 60;
-
 // Whether to show raw data or to show idealized data
 const IDEALIZED_VISUALS = false;
-// Signal that is currently displayed
+
+// Signal that is currently displayed on graph
 var displayed_signal = [];
 // Peaks that are being displayed
 var displayed_peaks = [];
-// Signal that is about to be displayed
+// Signal that is about to be displayed, used for idealized visuals mode
 var holding_signal = [];
 
+// Normalized signal that is used to draw idealized peaks.
 const PERFECT_PEAK = [0.0, 0.00295858, 0.00887574, 0.014792899, 0.023668639,
     0.029585799, 0.047337278, 0.088757396, 0.118343195, 0.210059172,
     0.417159763, 0.689349112, 0.914201183, 0.99704142, 0.940828402,
@@ -33,20 +34,37 @@ const PERFECT_PEAK = [0.0, 0.00295858, 0.00887574, 0.014792899, 0.023668639,
 
 // Full signal from start to finish
 var full_signal = [];
+
+// Holds the raw signal. Used for the calculation of peaks
 var chart = [];
-var upper_y_limit = 0;
-var lower_y_limit = 0;
+
+// Holds peaks. Peaks are removed either when they go offscreen or when
+// they first become visible, depending on whether idealized visuals are
+// shown or not.
 var chart2 = [];
+
+// Holds all time value pairs for detected peaks
 var rr = [];
+
+// Upper bound of y values displayed on graph
+var upper_y_limit = 0;
+// Lower bound of y values displayed on graph
+var lower_y_limit = 0;
+
+
 // The 'x' value of next frame. This frame is the cnt'th frame received.
 var cnt = 0;
+
+// Counter used to determine when peak detection interval is reached
 var window_idx = 0;
 
-// Counts the total number of frames collected during the test
+// Total number of frames collected during the test
 var total_frames = 0;
+
+// Width of viewing window, in samples
 const WINDOW_SIZE = 200;
 
-// standard deviation in the 60 most recent samples
+// Standard deviation in the 60 most recent samples
 var recentStandardDeviation = 200;
 
 // TODO(Tyler): This may be thirty if the device does not support 60 fps
@@ -54,7 +72,8 @@ var recentStandardDeviation = 200;
 // calculation of HRV
 var SAMPLING_FREQ = 60;
 
-for(i = 0; i < WINDOW_SIZE; i++){
+// Place default values in the arrays, filling them to WINDOW_SIZE
+for (i = 0; i < WINDOW_SIZE; i++) {
     chart.push({time: i, value: 0});
     displayed_signal.push({time: -2 * WINDOW_SIZE + i, value: 0});
     holding_signal.push({time: -WINDOW_SIZE + i, value: 0});
@@ -72,9 +91,9 @@ export default class HomePage extends Component {
     state = {
         width: null,
         height: null,
-        hrv: '...',
+        hrv: '...', // Text displayed to the user
         torchMode: null,
-        indeterminate: true,
+        indeterminate: true, // Whether the progress bar should spin or not
         hrvProgress: 0,
         draw_ctr : 0 // UI draws when draw_ctr equals zero
     }
@@ -83,11 +102,16 @@ export default class HomePage extends Component {
      * Dictates when the UI should be redrawn. Returns true only after
      * draw_ctr has cycled back to zero. Used to control refresh rate.
      */
-    shouldComponentUpdate(nextProps, nextState){
+    shouldComponentUpdate(nextProps, nextState) {
         return nextState.draw_ctr == 0;
     }
 
-    update(data){
+    /**
+     * Handler that runs when a new frame is captured by the camera.
+     * Records the new frame, updates window dimensions, and detects peaks
+     * if necessary.
+     */
+    update(data) {
         // Log that another frame has been received
         total_frames++;
         this.setState({rgb:data});
@@ -108,24 +132,27 @@ export default class HomePage extends Component {
 
         // Code to display the actual signal
         if (!IDEALIZED_VISUALS) {
-            // Remove the first item in chart
+            // Remove the first item in chart to make room for new one
             chart.shift();
             // Remove peaks from the scatter plot that are no longer visible
-            while (chart2.length >= 1 ){
-                if(chart2[0].time > 0 && chart2[0].time < chart[0].time){
+            while (chart2.length >= 1 ) {
+                if (chart2[0].time > 0 && chart2[0].time < chart[0].time) {
                     chart2.shift();
-                }
-                else {
+                } else {
                     break;
                 }
             }
 
-            if(chart2.length == 0){
-                chart2.push({time:chart[1].time,value:-10});
+            // If there are no peaks, push a peak with negative value
+            if (chart2.length == 0) {
+                chart2.push({time:chart[1].time, value:-10});
             }
 
+            // Append the latest frame received
             chart.push({time: cnt, value: int_data});
 
+            // The raw information is what we display as visuals are not
+            // idealized
             displayed_signal = chart;
             displayed_peaks = chart2;
         } else {
@@ -134,14 +161,15 @@ export default class HomePage extends Component {
             // here we pop a data point from the holding signal and append
             // to the display signal.
 
+            // Remove the oldest raw datapoint and append the new raw frame data
             chart.shift();
             chart.push({time: cnt, value: int_data});
 
+            // Remove the first displayed point as a new frame is incoming
+            // Add the new frame from the holding signal to displayed_signal
             displayed_signal.shift();
             var new_point = holding_signal.shift();
             displayed_signal.push(new_point);
-
-            // add a new point onto the back of the holding signal
 
             // Remove displayed peaks that are no longer visible
             var leftmost_edge = displayed_signal[0].time;
@@ -149,13 +177,12 @@ export default class HomePage extends Component {
                 var earliest_peak = displayed_peaks[0].time;
                 if (earliest_peak > 0 && earliest_peak < leftmost_edge) {
                     displayed_peaks.shift();
-                }
-                else {
+                } else {
                     break;
                 }
             }
 
-            // append peaks from chart2 onto the displaed peaks only when
+            // append peaks from chart2 onto the displayed peaks only when
             // they become visible
             if (chart2.length >= 1) {
                 var latest_time = displayed_signal[WINDOW_SIZE - 1].time;
@@ -165,7 +192,7 @@ export default class HomePage extends Component {
                 }
             }
 
-            // Add new entry to holding signal only if it is not already
+            // Add 0 signal onto holding signal only if it is not already
             // at its ideal length
             if (holding_signal.length < WINDOW_SIZE) {
                 // add window size to account for the part thats already filled
@@ -181,20 +208,30 @@ export default class HomePage extends Component {
 
             this.calcRecentStdDev();
 
-            if (recentStandardDeviation < 30 && total_frames >= 200) {
-                this.setState({hrv: 'Poor Signal'});
-            } else if (recentStandardDeviation >= 25 && total_frames >= 200) {
-                this.setState({hrv: 'HRV: calculating'});
-            }
+            this.detectPoorSignal();
 
             // Detect peaks
             this.peakDetection();
         }
     }
 
+    /**
+     * Detects if the current signal is poor and notifies the user if it is.
+     */
+    detectPoorSignal() {
+        if (recentStandardDeviation < 30 && total_frames >= 200) {
+            this.setState({hrv: 'Poor Signal'});
+        } else if (recentStandardDeviation >= 25 && total_frames >= 200) {
+            this.setState({hrv: 'HRV: calculating'});
+        }
+    }
 
+    /**
+     * Calculates the standard deviation within the most recent frames.
+     */
     calcRecentStdDev() {
-        // Number of frames to include in the calculation
+        // Number of frames to include in the calculation. Only includes most
+        // recent frames.
         const Calc_Width = 100;
         var length = chart.length;
 
@@ -221,11 +258,12 @@ export default class HomePage extends Component {
         var standardDeviation = Math.sqrt(avgSquaredDifference);
         recentStandardDeviation = standardDeviation;
     }
+
     /**
      * Calculates the average brightness and standard deviation for the
      * current window. Uses this to set the viewing window
      */
-    calcWindowStats(){
+    calcWindowStats() {
         if (!IDEALIZED_VISUALS) {
             // Set range based on standard deviation
             var sum = 0;
@@ -268,7 +306,7 @@ export default class HomePage extends Component {
     /**
      * Finds peaks in the current window.
      */
-    peakDetection(){
+    peakDetection() {
         const MAX_BPM = 150;
         const MAX_BPS = MAX_BPM / 60;
         // Min number of samples between peaks
@@ -284,7 +322,7 @@ export default class HomePage extends Component {
         var peak_val = 0;;
         var avg = 0;
 
-        for( i= 0; i < WINDOW_SIZE-1; i++){
+        for ( i= 0; i < WINDOW_SIZE-1; i++) {
             avg += chart[i].value;
 
             next_higher = chart[i + 1].value - chart[i].value >= 10;
@@ -294,12 +332,11 @@ export default class HomePage extends Component {
                 if (next_higher) {
                     console.log("Up:up, index: ",i," ,Value: ",chart[i].value ,"\n");
 
-                    if (chart[i+1].value > peak_val){
+                    if (chart[i+1].value > peak_val) {
                         peak_idx = i+1;
                         peak_val = chart[i+1].value;
                     }
-                }
-                else if (next_lower) {
+                } else if (next_lower) {
                     console.log("Up:Down, index: ",i," ,Value: ",chart[i].value ,"\n");
                     downcounter += 1;
                 }
@@ -382,17 +419,14 @@ export default class HomePage extends Component {
                     }
                     peak_val = 0;
                 }
-            }
-            else{
+            } else {
                 if (next_higher) {
                     console.log("Down:Up, index: ",i," ,Value: ",chart[i].value ,"\n");
                     upcounter +=1 ;
-                }
-                else if (next_lower) {
+                } else if (next_lower) {
                     console.log("Down:Down, index: ",i," ,Value: ",chart[i].value ,"\n");
                     upcounter -= 0;
-                }
-                if (upcounter >= 2) {
+                } if (upcounter >= 2) {
                     console.log("Down:Going up, index: ",i," ,Value: ",chart[i].value ,"\n");
                     downcounter = 0;
 
@@ -410,7 +444,7 @@ export default class HomePage extends Component {
         this.setState({ width, height });
     }
 
-    calculateHRV(){
+    calculateHRV() {
         // Calculate the true SAMPLING_FREQ (Frames / second)
         SAMPLING_FREQ = total_frames / TEST_LENGTH;
 
@@ -427,15 +461,13 @@ export default class HomePage extends Component {
         var rr_lower_thresh = 0.7;
         var rr_upper_thresh = 1.3;
         var removed_count = 0;
-        for(i=1; i < rr.length - 1; i++){
+        for (i = 1; i < rr.length - 1; i++) {
             // RR correction
-            if(Math.abs(rr[i].time - rr[i-1].time) < rr_lower_thresh*avg_rr || Math.abs(rr[i+1].time - rr[i].time) < rr_lower_thresh*avg_rr || Math.abs(rr[i].time - rr[i-1].time) > rr_upper_thresh*avg_rr || Math.abs(rr[i+1].time - rr[i].time) > rr_upper_thresh*avg_rr)
-                {
+            if (Math.abs(rr[i].time - rr[i-1].time) < rr_lower_thresh*avg_rr || Math.abs(rr[i+1].time - rr[i].time) < rr_lower_thresh*avg_rr || Math.abs(rr[i].time - rr[i-1].time) > rr_upper_thresh*avg_rr || Math.abs(rr[i+1].time - rr[i].time) > rr_upper_thresh*avg_rr) {
                     removed_count = removed_count + 1;
                     continue;
-                }
-            else {
-                sum_rr += Math.pow((Math.abs(rr[i+1].time - rr[i].time)-Math.abs(rr[i].time - rr[i-1].time)),2);
+            } else {
+                sum_rr += Math.pow((Math.abs(rr[i + 1].time - rr[i].time) - Math.abs(rr[i].time - rr[i - 1].time)), 2);
                 rr_cnt += 1;
             }
         }
@@ -443,7 +475,7 @@ export default class HomePage extends Component {
         console.log("really removed: " + removed_count);
         // alert("removed "+((rr.length-2)-rr_cnt)+" avg: "+(avg_rr * 1000/SAMPLING_FREQ));
 
-        if(rr_cnt) {
+        if (rr_cnt) {
             rmssd = Math.sqrt(sum_rr/rr_cnt);
             // alert('rmssd before multiplying: ' + rmssd);
         } else {
@@ -479,7 +511,6 @@ export default class HomePage extends Component {
         CameraController.turnTorchOn(false);
         this.listener.remove();
         CameraController.stop();
-
     }
 
     // TODO(Tyler): Modify this method so that the button  will stop
@@ -497,7 +528,7 @@ export default class HomePage extends Component {
         this._interval = setInterval(() => this.updateProgress(), PROGRESS_BAR_INTERVAL * 1000);
     }
 
-    updateProgress(){
+    updateProgress() {
         // There are TEST_LENGTH / PROGRESS_BAR_INTERVAL ticks
         // After all ticks are complete, bar must be completely progressed
         this.setState({hrvProgress: this.state.hrvProgress

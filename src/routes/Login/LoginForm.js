@@ -1,5 +1,5 @@
 import React , {Component} from 'react';
-import {StyleSheet, View, NetInfo, TextInput, Text, TouchableOpacity, AsyncStorage} from 'react-native';
+import {StyleSheet, View, TextInput, Text, TouchableOpacity} from 'react-native';
 import {Actions} from 'react-native-router-flux';
 
 
@@ -11,15 +11,6 @@ export default class LoginForm extends Component{
             email: null,
             password: null
         };
-    }
-
-    async saveItem(item, selectedValue) {
-        alert('saveItem Called');
-        try {
-            await AsyncStorage.setItem(item, selectedValue);
-        } catch (error) {
-            console.error('AsyncStorage error: ' + error.message);
-        }
     }
 
     /**
@@ -61,7 +52,7 @@ export default class LoginForm extends Component{
             .then((response) => response.json())
             .then((responseData) => {
                 if (!responseData) {
-                    throw ('New Exception');
+                    alert('New Exception');
                 }
                 if (responseData.success) {
                     if (responseData.role == 'athlete') {
