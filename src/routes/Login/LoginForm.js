@@ -1,6 +1,7 @@
 import React , {Component} from 'react';
-import {StyleSheet, View, TextInput, Text, TouchableOpacity, AsyncStorage} from 'react-native';
+import {StyleSheet, View, NetInfo, TextInput, Text, TouchableOpacity, AsyncStorage} from 'react-native';
 import {Actions} from 'react-native-router-flux';
+
 
 export default class LoginForm extends Component{
 
@@ -13,6 +14,7 @@ export default class LoginForm extends Component{
     }
 
     async saveItem(item, selectedValue) {
+        alert('saveItem Called');
         try {
             await AsyncStorage.setItem(item, selectedValue);
         } catch (error) {
@@ -20,37 +22,78 @@ export default class LoginForm extends Component{
         }
     }
 
+    /**
+     * Handle errors encountered during the attempt to log in.
+     */
+    handleErrors(response) {
+        if (!response.ok) {
+            alert(response.statusText);
+            alert("Unable to log in. Please try again later.");
+            Actions.Login();
+        }
+        return response;
+    }
+
+    /**
+     * Logs the user in. Runs when the login button is pressed.
+     */
     userLogin() {
-        if (!this.state.email || !this.state.password) return;
-        // TODO: localhost doesn't work because the app is running inside an emulator. Get the IP address with ifconfig.
-        // Actions.HomePage();
-        fetch('http://er-lab.cs.ucla.edu:443/mobile/login', {
-            method: 'POST',
-            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                email: this.state.email,
-                password: this.state.password
-            })
-        })
-        .then((response) => response.json())
-        .then((responseData) => {
-            if(responseData.success && responseData.role == 'athlete'){
-                // TODO : For server middleware ('hasAccess')
-                // Transition to the homepage, passing along necessary data
-                Actions.HomePage({firstname: responseData.firstname,
-                                  lastname: responseData.lastname,
-                                  team: responseData.team});
-            }
-            else if (responseData.role == 'coach') {
-                alert('App only usable by athletes.');
+        if (!this.state.email || !this.state.password) {
+            return;
+        }
+
+            // isConnected = NetInfo.getConnectionInfo().then(reachability => {
+            //     if (reachability.type === 'unknown') {
+            //         return new Promise(resolve => {
+            //             const handleFirstConnectivityChangeIOS = isConnected => {
+            //                 NetInfo.isConnected.removeEventListener('connectionChange', handleFirstConnectivityChangeIOS);
+            //             resolve(isConnected);
+            //             };
+            //             NetInfo.isConnected.addEventListener('connectionChange', handleFirstConnectivityChangeIOS);
+            //         });
+            //     }
+            //     return (reachability.type !== 'none' && reachability.type !== 'unknown')
+            // });
+            isConnected = true;
+            if (!isConnected) {
+                alert('No internet connection. Please check connection and '
+                    + 'try again.');
                 Actions.Login();
+            } else {
+                fetch('http://er-lab.cs.ucla.edu:443/mobile/login', {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json',
+                        'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            email: this.state.email,
+                            password: this.state.password
+                        })
+                })
+                .then(this.handleErrors)
+                .then((response) => response.json())
+                .then((responseData) => {
+                    if (!responseData) {
+                        throw ('New Exception');
+                    }
+                    if (responseData.success) {
+                        if (responseData.role == 'athlete') {
+                            // Transition to the homepage, passing along
+                            // necessary data
+                            Actions.HomePage({firstname: responseData.firstname,
+                                              lastname: responseData.lastname,
+                                              team: responseData.team});
+                        } else {
+                            alert('App only usable by athletes.');
+                            Actions.Login();
+                        }
+                    } else {
+                        alert('Wrong username/password');
+                        Actions.Login();
+                    }
+                })
+                .done();
             }
-            else{
-                alert('Wrong username/password');
-                Actions.Login();
-            }
-        })
-        .done();
+        // });
     }
 
 
@@ -63,6 +106,7 @@ export default class LoginForm extends Component{
                     onChangeText={(email) => this.setState({email})}
                     onSubmitEditing = {() => this.passwordInput.focus()}
                     autoCapitalize="none"
+                    keyboardType="email-address"
                     autoCorrect={false}
                     style = {styles.input} />
 

@@ -98,6 +98,11 @@ export default class HomePage extends Component {
         cnt += 1;
         window_idx += 1;
 
+        // 1 is the first value inserted
+        if (displayed_signal[WINDOW_SIZE - 1].time == 1) {
+            this.setState({hrv: 'HRV: calculating'});
+        }
+
         // Code to display the actual signal
         if (!IDEALIZED_VISUALS) {
             // Remove the first item in chart
@@ -132,7 +137,6 @@ export default class HomePage extends Component {
             displayed_signal.shift();
             var new_point = holding_signal.shift();
             displayed_signal.push(new_point);
-
 
             // add a new point onto the back of the holding signal
 
@@ -240,11 +244,12 @@ export default class HomePage extends Component {
         var peak_val = 0;;
         var avg = 0;
 
-        for(i=0; i<WINDOW_SIZE-1; i++){
+        for( i= 0; i < WINDOW_SIZE-1; i++){
             avg += chart[i].value;
 
-            next_higher = chart[i + 1].value - chart[i].value >= 5;
+            next_higher = chart[i + 1].value - chart[i].value >= 10;
             next_lower = !next_higher;
+
             if (up) {
                 if (next_higher) {
                     console.log("Up:up, index: ",i," ,Value: ",chart[i].value ,"\n");
@@ -353,7 +358,6 @@ export default class HomePage extends Component {
 
                     up = true;
                 }
-
             }
         }
 
@@ -364,7 +368,6 @@ export default class HomePage extends Component {
         const { width, height } = event.nativeEvent.layout;
 
         this.setState({ width, height });
-
     }
 
     calculateHRV(){
@@ -409,7 +412,7 @@ export default class HomePage extends Component {
         }
 
         rmssd *= 1000.0 / SAMPLING_FREQ;
-        this.setState({hrv:'HRV: ' + Math.floor(rmssd),indeterminate:true});
+        this.setState({hrv:'HRV: ' + Math.floor(rmssd), indeterminate:true});
         // Set draw_ctr to zero so that UI will draw
         this.setState({draw_ctr: 0});
         rr = [];
@@ -449,7 +452,7 @@ export default class HomePage extends Component {
         this.listener = myModuleEvt.addListener('sayHello', (data) => this.update(data));
         CameraController.start();
         CameraController.turnTorchOn(true);
-        this.setState({indeterminate:false,hrvProgress:0, hrv: 'HRV: calculating'});
+        this.setState({indeterminate: false, hrvProgress: 0, hrv: 'Starting...'});
         setTimeout(() => this.calculateHRV(), 1000 * TEST_LENGTH);
         this._interval = setInterval(() => this.updateProgress(), PROGRESS_BAR_INTERVAL * 1000);
     }
@@ -465,8 +468,6 @@ export default class HomePage extends Component {
         this.listener.remove();
         clearInterval(this._interval);
     }
-
-
 
     render() {
             return (
@@ -533,7 +534,6 @@ export default class HomePage extends Component {
 
             );
        }
-
 }
 
 
