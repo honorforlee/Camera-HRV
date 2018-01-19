@@ -42,58 +42,45 @@ export default class LoginForm extends Component{
             return;
         }
 
-            // isConnected = NetInfo.getConnectionInfo().then(reachability => {
-            //     if (reachability.type === 'unknown') {
-            //         return new Promise(resolve => {
-            //             const handleFirstConnectivityChangeIOS = isConnected => {
-            //                 NetInfo.isConnected.removeEventListener('connectionChange', handleFirstConnectivityChangeIOS);
-            //             resolve(isConnected);
-            //             };
-            //             NetInfo.isConnected.addEventListener('connectionChange', handleFirstConnectivityChangeIOS);
-            //         });
-            //     }
-            //     return (reachability.type !== 'none' && reachability.type !== 'unknown')
-            // });
-            isConnected = true;
-            if (!isConnected) {
-                alert('No internet connection. Please check connection and '
-                    + 'try again.');
-                Actions.Login();
-            } else {
-                fetch('http://er-lab.cs.ucla.edu:443/mobile/login', {
-                    method: 'POST',
-                    headers: { 'Accept': 'application/json',
-                        'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            email: this.state.email,
-                            password: this.state.password
-                        })
-                })
-                .then(this.handleErrors)
-                .then((response) => response.json())
-                .then((responseData) => {
-                    if (!responseData) {
-                        throw ('New Exception');
-                    }
-                    if (responseData.success) {
-                        if (responseData.role == 'athlete') {
-                            // Transition to the homepage, passing along
-                            // necessary data
-                            Actions.HomePage({firstname: responseData.firstname,
-                                              lastname: responseData.lastname,
-                                              team: responseData.team});
-                        } else {
-                            alert('App only usable by athletes.');
-                            Actions.Login();
-                        }
+        isConnected = true;
+        if (!isConnected) {
+            alert('No internet connection. Please check connection and '
+                + 'try again.');
+            Actions.Login();
+        } else {
+            fetch('http://er-lab.cs.ucla.edu:443/mobile/login', {
+                method: 'POST',
+                headers: { 'Accept': 'application/json',
+                    'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: this.state.email,
+                        password: this.state.password
+                    })
+            })
+            .then(this.handleErrors)
+            .then((response) => response.json())
+            .then((responseData) => {
+                if (!responseData) {
+                    throw ('New Exception');
+                }
+                if (responseData.success) {
+                    if (responseData.role == 'athlete') {
+                        // Transition to the homepage, passing along
+                        // necessary data
+                        Actions.HomePage({firstname: responseData.firstname,
+                                          lastname: responseData.lastname,
+                                          team: responseData.team});
                     } else {
-                        alert('Wrong username/password');
+                        alert('App only usable by athletes.');
                         Actions.Login();
                     }
-                })
-                .done();
-            }
-        // });
+                } else {
+                    alert('Wrong username/password');
+                    Actions.Login();
+                }
+            })
+            .done();
+        }
     }
 
 

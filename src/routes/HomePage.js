@@ -15,7 +15,7 @@ const PROGRESS_BAR_INTERVAL = 1.0;
 const PEAK_DETECTION_INTERVAL = 60;
 
 // Whether to show raw data or to show idealized data
-const IDEALIZED_VISUALS = true;
+const IDEALIZED_VISUALS = false;
 // Signal that is currently displayed
 var displayed_signal = [];
 // Peaks that are being displayed
@@ -45,6 +45,9 @@ var window_idx = 0;
 // Counts the total number of frames collected during the test
 var total_frames = 0;
 const WINDOW_SIZE = 200;
+
+// standard deviation in the 60 most recent samples
+var recentStandardDeviation = 200;
 
 // TODO(Tyler): This may be thirty if the device does not support 60 fps
 // Tentatively 60 during the recording phase, updated to real value for
@@ -176,11 +179,48 @@ export default class HomePage extends Component {
             // Calculate upper and lower limits for graph y axis
             this.calcWindowStats();
 
+            this.calcRecentStdDev();
+
+            if (recentStandardDeviation < 30 && total_frames >= 200) {
+                this.setState({hrv: 'Poor Signal'});
+            } else if (recentStandardDeviation >= 25 && total_frames >= 200) {
+                this.setState({hrv: 'HRV: calculating'});
+            }
+
             // Detect peaks
             this.peakDetection();
         }
     }
 
+
+    calcRecentStdDev() {
+        // Number of frames to include in the calculation
+        const Calc_Width = 100;
+        var length = chart.length;
+
+        var count = 0;
+        var sum = 0;
+
+        for (var i = 1; i <= Calc_Width && length - i >= 0; i++) {
+            sum += chart[length - i].value;
+            count++;
+        }
+
+        var averageBrightness = sum / count;
+        var int_avg = Math.floor(averageBrightness);
+
+        var sumOfSquaredDifferences = 0;
+
+        for (var i = 1; i <= Calc_Width && length - i >= 0; i++) {
+            var currBrightness = chart[length - i].value;
+            var difference = Math.abs(currBrightness - averageBrightness);
+            sumOfSquaredDifferences += Math.pow(difference, 2);
+        }
+
+        var avgSquaredDifference = sumOfSquaredDifferences / count;
+        var standardDeviation = Math.sqrt(avgSquaredDifference);
+        recentStandardDeviation = standardDeviation;
+    }
     /**
      * Calculates the average brightness and standard deviation for the
      * current window. Uses this to set the viewing window
