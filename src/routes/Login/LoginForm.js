@@ -101,31 +101,29 @@ export default class LoginForm extends Component {
   render() {
     return (
       <View style={styles.container}>
-        <TextInput>
-          placeholder=&quot; username or email&quot;
-          returnKeyType=&quot;next&quot;
+        <TextInput
+          placeholder=" username or email"
+          returnKeyType="next"
           onChangeText={email => this.setState({ email })}
           onSubmitEditing={() => this.passwordInput.focus()}
-          autoCapitalize=&quot;none&quot;
-          keyboardType=&quot;email-address&quot;
+          autoCapitalize="none"
+          keyboardType="email-address"
           autoCorrect={false}
           style={styles.input}
-        </TextInput>
+        />
 
-        <TextInput>
-          placeholder=&quot; password&quot;
-          secureTextEntry={true}
-          returnKeyType=&quot;go&quot;
+        <TextInput
+          placeholder=" password"
+          secureTextEntry
+          returnKeyType="go"
           onChangeText={password => this.setState({ password })}
-          ref = { (input) => { this.passwordInput = input; }}
-          autoCapitalize=&quot;none&quot;
+          ref={(input) => { this.passwordInput = input; }}
+          autoCapitalize="none"
           autoCorrect={false}
           style={styles.input}
-        </TextInput>
+        />
 
-        <TouchableOpacity>
-          style={styles.buttonContainer}
-          onPress={this.userLogin.bind(this)}
+        <TouchableOpacity style={styles.buttonContainer} onPress={this.userLogin.bind(this)}>
           <Text style={styles.buttonText}> Login </Text>
         </TouchableOpacity>
       </View>

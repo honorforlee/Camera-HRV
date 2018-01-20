@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
   },
 });
 
-const { CameraController } = require('NativeModules').CameraController;
+var CameraController = require('NativeModules').CameraController;
 
 const myModuleEvt = new NativeEventEmitter(CameraController);
 

@@ -39,10 +39,10 @@ export default class Login extends Component {
     return (
       <KeyboardAvoidingView behavior="padding" style={styles.container}>
         <View style={styles.logoContainer}>
-          <Image>
+          <Image
             style={styles.logo}
             source={imageSource}
-          </Image>
+          />
 
           <Text style={styles.title}> Sport Analytics HRV </Text>
         </View>
