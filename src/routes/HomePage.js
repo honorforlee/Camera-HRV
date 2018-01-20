@@ -96,6 +96,32 @@ for (let i = 0; i < WINDOW_SIZE; i += 1) {
   holdingSignal.push({ time: -WINDOW_SIZE + i, value: 0 });
 }
 
+const styles = StyleSheet.create({
+  mainContainer: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: 'skyblue',
+  },
+  container: {
+    flex: 5,
+    flexDirection: 'row',
+  },
+  HRVButton: {
+    width: '100%',
+    height: '30%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  progressCircle: {
+    margin: 50,
+  },
+  preview: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+});
+
 const { CameraController } = require('NativeModules').CameraController;
 
 const myModuleEvt = new NativeEventEmitter(CameraController);
@@ -332,7 +358,7 @@ export default class HomePage extends Component {
    */
   peakDetection() {
     const MAX_BPM = 150;
-    const MAX_BPS = MAX_BPM / 60;
+    // const MAX_BPS = MAX_BPM / 60;
     // Min number of samples between peaks
     // const MIN_INTERPEAK_DISTANCE = SAMPLING_FREQ / MAX_BPS;
 
@@ -583,94 +609,83 @@ export default class HomePage extends Component {
   }
 
   render() {
-            return (
+    return (
+      <View style={styles.mainContainer}>
 
-                    <View style={styles.mainContainer}>
+        <View style={{ flex: 0.75, backgroundColor: 'skyblue' }}>
+          <ProgressBar
+            style={styles.progressCircle}
+            size={100}
+            color="#FA8072"
+            thickness={10}
+            progress={this.state.hrvProgress}
+            indeterminate={this.state.indeterminate}
+          />
+        </View>
 
+        <View style={{ flex: 2 }}>
 
-                        <View style={{flex: .75, backgroundColor: 'skyblue'}}>
-                          <ProgressBar
-                            style={styles.progressCircle}
-                            size= {100}
-                            color= {"#FA8072"}
-                            thickness= {10}
-                            progress={this.state.hrvProgress}
-                            indeterminate={this.state.indeterminate}
-                          />
-                        </View>
+          <View style={{
+            flex: 1,
+            backgroundColor: 'powderblue',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            }}
+          >
 
-                        <View style={{flex: 2}}>
+            <Button
+              containerStyle={{
+                padding: 10,
+                height: 45,
+                overflow: 'hidden',
+                borderRadius: 4,
+                backgroundColor: 'red',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+              style={{ fontSize: 20, color: 'white', width: '70%' }}
+              onPress={this.start.bind(this)}>
+              Calculate HRV2
+            </Button>
 
-                            <View  style={{flex: 1, backgroundColor: 'powderblue',flexDirection: 'column', justifyContent: 'center', alignItems: 'center'}}>
+            <Text style={{ fontSize: 40, fontWeight: 'bold', justifyContent: 'center' }} >{this.state.hrv}</Text>
+          </View>
 
-                                <Button
-                                    containerStyle={{padding:10, height:45, overflow:'hidden', borderRadius:4, backgroundColor: 'red', justifyContent: 'center', alignItems: 'center'}}
-                                    style = {{fontSize:20,color:'white', width:'70%'}}
-                                    onPress={this.start.bind(this)}>
-                                    Calculate HRV2
-                                </Button>
+          <View style={{ flex: 4 }}>
+            <VictoryChart theme={VictoryTheme.material}>
 
-                                <Text style={{fontSize: 40,fontWeight: 'bold', justifyContent: 'center'}} >{this.state.hrv}</Text>
-                            </View>
+              <VictoryLine
+                style={{
+                  parent: { border: '1px solid #ccc' },
+                  data: { stroke: '#c43a31', strokeWidth: 2 },
+                }}
+                domain={{
+                  y: [lowerYLimit, upperYLimit],
+                  x: [displayedSignal[0].time,
+                  displayedSignal[WINDOW_SIZE - 1].time],
+                }}
+                data={displayedSignal}
+                x="time"
+                y="value"
+              />
 
-
-                            <View style={{flex: 4}}>
-                                <VictoryChart theme={VictoryTheme.material}>
-
-                                    <VictoryLine
-                                        style={{
-                                            parent: {border: "1px solid #ccc"},
-                                            data: { stroke: "#c43a31", strokeWidth: 2 }
-                                        }}
-                                        domain={{y: [lowerYLimit, upperYLimit], x: [displayedSignal[0].time, displayedSignal[WINDOW_SIZE-1].time]}}
-                                        data={displayedSignal}
-                                        x="time"
-                                        y="value" />
-
-                                    <VictoryScatter
-                                        style={{ data: { fill: "#c43a31" } }}
-                                        size={7}
-                                        domain={{y: [lowerYLimit, upperYLimit], x: [displayedSignal[0].time, displayedSignal[WINDOW_SIZE-1].time]}}
-                                        data={displayedPeaks}
-                                        x="time"
-                                        y="value"  />
-
-
-                                </VictoryChart>
-
-                            </View>
-
-
-                        </View>
-
-                    </View>
-
-            );
-       }
+              <VictoryScatter
+                style={{ data: { fill: '#c43a31' } }}
+                size={7}
+                domain={{
+                  y: [lowerYLimit, upperYLimit],
+                  x: [displayedSignal[0].time,
+                  displayedSignal[WINDOW_SIZE - 1].time],
+                }}
+                data={displayedPeaks}
+                x="time"
+                y="value"
+              />
+            </VictoryChart>
+          </View>
+        </View>
+      </View>
+    );
+  }
 }
-
-const styles = StyleSheet.create({
-    mainContainer: {
-        flex: 1,
-        alignItems: 'center',
-        backgroundColor: 'skyblue',
-    },
-    container: {
-        flex: 5,
-        flexDirection: 'row',
-    },
-    HRVButton: {
-        width: '100%',
-        height: '30%',
-        justifyContent: 'center',
-        alignItems: 'center'
-    },
-    progressCircle: {
-        margin: 50
-    },
-    preview: {
-        flex: 1,
-        justifyContent: 'flex-end',
-        alignItems: 'center'
-    }
-});

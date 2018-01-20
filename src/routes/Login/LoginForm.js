@@ -102,23 +102,23 @@ export default class LoginForm extends Component {
     return (
       <View style={styles.container}>
         <TextInput>
-          placeholder=" username or email"
-          returnKeyType="next"
+          placeholder=&quot; username or email&quot;
+          returnKeyType=&quot;next&quot;
           onChangeText={email => this.setState({ email })}
           onSubmitEditing={() => this.passwordInput.focus()}
-          autoCapitalize="none"
-          keyboardType="email-address"
+          autoCapitalize=&quot;none&quot;
+          keyboardType=&quot;email-address&quot;
           autoCorrect={false}
           style={styles.input}
         </TextInput>
 
         <TextInput>
-          placeholder=" password"
+          placeholder=&quot; password&quot;
           secureTextEntry={true}
-          returnKeyType="go"
+          returnKeyType=&quot;go&quot;
           onChangeText={password => this.setState({ password })}
           ref = { (input) => { this.passwordInput = input; }}
-          autoCapitalize="none"
+          autoCapitalize=&quot;none&quot;
           autoCorrect={false}
           style={styles.input}
         </TextInput>
