@@ -51,7 +51,7 @@ NSString *host = [[_bridge bundleURL] host] ?: @"YOUR_IP";
 ```
 **NOTE:** This step will need to be repeated every time your build machine's IP address changes. This IP is used for the mobile devices to locate the JavaScript files on the build machine.
 
-3. Navigate to `Camera-HRV/ios/AppDelegate.m` and replace the `jsCodeLocation` line with the following, where `YOUR_IP` is your build machine's IP address:
+3. Navigate to `Camera-HRV/ios/CameraHRV2/AppDelegate.m` and replace the `jsCodeLocation` line with the following, where `YOUR_IP` is your build machine's IP address:
 ```
 jsCodeLocation = [NSURL URLWithString:@"http://YOUR_IP:8081/index.ios.bundle?platform=ios&dev=true"];
 ```
