@@ -1,7 +1,13 @@
-import React , {Component} from 'react';
-import {StyleSheet, View, Image, Text, KeyboardAvoidingView} from 'react-native';
-import LoginForm from './LoginForm'
+import React, {Component} from 'react';
+import {
+  Image,
+  KeyboardAvoidingView,
+  StyleSheet,
+  Text,
+  View
+} from 'react-native';
 import {Actions} from 'react-native-router-flux';
+import LoginForm from './LoginForm'
 
 export default class Login extends Component{
     render() {
