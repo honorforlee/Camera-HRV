@@ -8,6 +8,8 @@ import {
 } from 'react-native';
 import LoginForm from './LoginForm';
 
+const imageSource = require('../../images/mascot2.png');
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -35,11 +37,11 @@ const styles = StyleSheet.create({
 export default class Login extends Component {
   render() {
     return (
-      <KeyboardAvoidingView behavior = 'padding' style = {styles.container}>
+      <KeyboardAvoidingView behavior="padding" style={styles.container}>
         <View style={styles.logoContainer}>
           <Image>
             style={styles.logo}
-            source={require('../../images/mascot2.png')}
+            source={imageSource}
           </Image>
 
           <Text style={styles.title}> Sport Analytics HRV </Text>

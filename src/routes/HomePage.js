@@ -34,11 +34,11 @@ const PEAK_DETECTION_INTERVAL = 60;
 const IDEALIZED_VISUALS = false;
 
 // Signal that is currently displayed on graph
-let displayed_signal = [];
+let displayedSignal = [];
 // Peaks that are being displayed
-let displayed_peaks = [];
+let displayedPeaks = [];
 // Signal that is about to be displayed, used for idealized visuals mode
-let holding_signal = [];
+const holdingSignal = [];
 
 // Normalized signal that is used to draw idealized peaks.
 const PERFECT_PEAK = [
@@ -51,32 +51,32 @@ const PERFECT_PEAK = [
 ];
 
 // Full signal from start to finish
-let full_signal = [];
+const fullSignal = [];
 
 // Holds the raw signal. Used for the calculation of peaks
-let chart = [];
+const chart = [];
 
 // Holds peaks. Peaks are removed either when they go offscreen or when
 // they first become visible, depending on whether idealized visuals are
 // shown or not.
-let chart2 = [];
+const chart2 = [];
 
 // Holds all time value pairs for detected peaks
 let rr = [];
 
 // Upper bound of y values displayed on graph
-let upper_y_limit = 0;
+let upperYLimit = 0;
 // Lower bound of y values displayed on graph
-let lower_y_limit = 0;
+let lowerYLimit = 0;
 
 // The 'x' value of next frame. This frame is the cnt'th frame received.
 let cnt = 0;
 
 // Counter used to determine when peak detection interval is reached
-let window_idx = 0;
+let windowIndex = 0;
 
 // Total number of frames collected during the test
-let total_frames = 0;
+let totalFrames = 0;
 
 // Width of viewing window, in samples
 const WINDOW_SIZE = 200;
@@ -92,8 +92,8 @@ let SAMPLING_FREQ = 60;
 // Place default values in the arrays, filling them to WINDOW_SIZE
 for (let i = 0; i < WINDOW_SIZE; i += 1) {
   chart.push({ time: i, value: 0 });
-  displayed_signal.push({ time: (-2 * WINDOW_SIZE) + i, value: 0 });
-  holding_signal.push({ time: -WINDOW_SIZE + i, value: 0 });
+  displayedSignal.push({ time: (-2 * WINDOW_SIZE) + i, value: 0 });
+  holdingSignal.push({ time: -WINDOW_SIZE + i, value: 0 });
 }
 
 const { CameraController } = require('NativeModules').CameraController;
@@ -138,20 +138,20 @@ export default class HomePage extends Component {
    */
   processFrame(data) {
     // Log that another frame has been received
-    total_frames += 1;
+    totalFrames += 1;
     this.setState({ rgb: data });
     this.setState(state => ({ draw_ctr: ((state.draw_ctr + 1) % 5) }));
 
-    const int_data = parseInt(data, 10);
+    const intData = parseInt(data, 10);
 
     // Record this bit of the signal
-    full_signal.push(int_data);
+    fullSignal.push(intData);
 
     cnt += 1;
-    window_idx += 1;
+    windowIndex += 1;
 
     // 1 is the first value inserted
-    if (displayed_signal[WINDOW_SIZE - 1].time === 1) {
+    if (displayedSignal[WINDOW_SIZE - 1].time === 1) {
       this.setState({ hrv: 'HRV: calculating' });
     }
 
@@ -174,12 +174,12 @@ export default class HomePage extends Component {
       }
 
       // Append the latest frame received
-      chart.push({ time: cnt, value: int_data });
+      chart.push({ time: cnt, value: intData });
 
       // The raw information is what we display as visuals are not
       // idealized
-      displayed_signal = chart;
-      displayed_peaks = chart2;
+      displayedSignal = chart;
+      displayedPeaks = chart2;
     } else {
       // Display the idealized signal
 
@@ -188,20 +188,20 @@ export default class HomePage extends Component {
 
       // Remove the oldest raw datapoint and append the new raw frame data
       chart.shift();
-      chart.push({ time: cnt, value: int_data });
+      chart.push({ time: cnt, value: intData });
 
       // Remove the first displayed point as a new frame is incoming
-      // Add the new frame from the holding signal to displayed_signal
-      displayed_signal.shift();
-      const new_point = holding_signal.shift();
-      displayed_signal.push(new_point);
+      // Add the new frame from the holding signal to displayedSignal
+      displayedSignal.shift();
+      const newPoint = holdingSignal.shift();
+      displayedSignal.push(newPoint);
 
       // Remove displayed peaks that are no longer visible
-      const leftmost_edge = displayed_signal[0].time;
-      while (displayed_peaks.length >= 1) {
-        const earliest_peak = displayed_peaks[0].time;
-        if (earliest_peak > 0 && earliest_peak < leftmost_edge) {
-          displayed_peaks.shift();
+      const leftmostEdge = displayedSignal[0].time;
+      while (displayedPeaks.length >= 1) {
+        const earliestPeak = displayedPeaks[0].time;
+        if (earliestPeak > 0 && earliestPeak < leftmostEdge) {
+          displayedPeaks.shift();
         } else {
           break;
         }
@@ -210,23 +210,23 @@ export default class HomePage extends Component {
       // append peaks from chart2 onto the displayed peaks only when
       // they become visible
       if (chart2.length >= 1) {
-        const latest_time = displayed_signal[WINDOW_SIZE - 1].time;
-        const earliest_waiting_peak = chart2[0].time;
-        if (earliest_waiting_peak <= latest_time) {
-          displayed_peaks.push(chart2.shift());
+        const latestTime = displayedSignal[WINDOW_SIZE - 1].time;
+        const earliestWaitingPeak = chart2[0].time;
+        if (earliestWaitingPeak <= latestTime) {
+          displayedPeaks.push(chart2.shift());
         }
       }
 
       // Add 0 signal onto holding signal only if it is not already
       // at its ideal length
-      if (holding_signal.length < WINDOW_SIZE) {
+      if (holdingSignal.length < WINDOW_SIZE) {
         // add window size to account for the part thats already filled
-        holding_signal.push({ time: cnt, value: 0 });
+        holdingSignal.push({ time: cnt, value: 0 });
       }
     }
 
-    if (window_idx === PEAK_DETECTION_INTERVAL) {
-      window_idx = 0;
+    if (windowIndex === PEAK_DETECTION_INTERVAL) {
+      windowIndex = 0;
 
       // Calculate upper and lower limits for graph y axis
       this.calcWindowStats();
@@ -244,9 +244,9 @@ export default class HomePage extends Component {
    * Detects if the current signal is poor and notifies the user if it is.
    */
   detectPoorSignal() {
-    if (recentStandardDeviation < 30 && total_frames >= 200) {
+    if (recentStandardDeviation < 30 && totalFrames >= 200) {
       this.setState({ hrv: 'Poor Signal' });
-    } else if (recentStandardDeviation >= 25 && total_frames >= 200) {
+    } else if (recentStandardDeviation >= 25 && totalFrames >= 200) {
       this.setState({ hrv: 'HRV: calculating' });
     }
   }
@@ -258,12 +258,12 @@ export default class HomePage extends Component {
   calcRecentStdDev() {
     // Number of frames to include in the calculation. Only includes most
     // recent frames.
-    const Calc_Width = 100;
+    const calcWidth = 100;
 
     let count = 0;
     let sum = 0;
 
-    for (let i = 1; i <= Calc_Width && chart.length - i >= 0; i += 1) {
+    for (let i = 1; i <= calcWidth && chart.length - i >= 0; i += 1) {
       sum += chart[chart.length - i].value;
       count += 1;
     }
@@ -272,7 +272,7 @@ export default class HomePage extends Component {
 
     let sumOfSquaredDifferences = 0;
 
-    for (let i = 1; i <= Calc_Width && chart.length - i >= 0; i += 1) {
+    for (let i = 1; i <= calcWidth && chart.length - i >= 0; i += 1) {
       const currBrightness = chart[chart.length - i].value;
       const difference = Math.abs(currBrightness - averageBrightness);
       sumOfSquaredDifferences += difference ** 2;
@@ -280,7 +280,7 @@ export default class HomePage extends Component {
 
     const avgSquaredDifference = sumOfSquaredDifferences / count;
     const standardDeviation = Math.sqrt(avgSquaredDifference);
-    this.recentStandardDeviation = standardDeviation;
+    recentStandardDeviation = standardDeviation;
   }
 
   /**
@@ -297,22 +297,22 @@ export default class HomePage extends Component {
       }
 
       const averageBrightness = sum / chart.length;
-      const int_avg = Math.floor(averageBrightness);
+      const intAvg = Math.floor(averageBrightness);
 
       let sumOfSquaredDifferences = 0;
 
       for (let i = 0; i < chart.length; i += 1) {
         const currBrightness = chart[i].value;
         const difference = Math.abs(currBrightness - averageBrightness);
-        sumOfSquaredDifferences += Math.pow(difference, 2);
+        sumOfSquaredDifferences += difference ** 2;
       }
 
       const avgSquaredDifference = sumOfSquaredDifferences / chart.length;
       const standardDeviation = Math.sqrt(avgSquaredDifference);
       const sigma = Math.ceil(standardDeviation);
 
-      this.upper_y_limit = int_avg + (3 * sigma);
-      this.lower_y_limit = int_avg - (3 * sigma);
+      upperYLimit = intAvg + (3 * sigma);
+      lowerYLimit = intAvg - (3 * sigma);
     } else {
       // If showing the idealized signal, the lower peak should be zero
       // max should be a bit over the peak's value
@@ -322,8 +322,8 @@ export default class HomePage extends Component {
           max = chart[i].value;
         }
       }
-      this.upper_y_limit = 1.1 * max;
-      this.lower_y_limit = 0;
+      upperYLimit = 1.1 * max;
+      lowerYLimit = 0;
     }
   }
 
@@ -342,114 +342,132 @@ export default class HomePage extends Component {
     let up = false;
     let upcounter = 0;
     let downcounter = 0;
-    let peak_idx = 0;
-    let peak_val = 0;
-    let avg = 0;
+    let peakIndex = 0;
+    let peakVal = 0;
 
-    for (i = 0; i < WINDOW_SIZE - 1; i += 1) {
-      avg += chart[i].value;
+    let nextHigher = false;
+    let nextLower = false;
 
-      next_higher = chart[i + 1].value - chart[i].value >= 10;
-      next_lower = !next_higher;
+
+    let latestPeakTime;
+    let peakTime;
+    let interpeakDistance;
+    let peakValue;
+
+    for (let i = 0; i < WINDOW_SIZE - 1; i += 1) {
+      nextHigher = chart[i + 1].value - chart[i].value >= 10;
+      nextLower = !nextHigher;
 
       if (up) {
-        if (next_higher) {
-          console.log("Up:up, index: ", i, " ,Value: ", chart[i].value, "\n");
+        if (nextHigher) {
+          console.log('Up:up, index: ', i, ' ,Value: ', chart[i].value, '\n');
 
-          if (chart[i + 1].value > peak_val) {
-            peak_idx = i + 1;
-            peak_val = chart[i + 1].value;
+          if (chart[i + 1].value > peakVal) {
+            peakIndex = i + 1;
+            peakVal = chart[i + 1].value;
           }
-        } else if (next_lower) {
-          console.log("Up:Down, index: ", i, " ,Value: ", chart[i].value, "\n");
+        } else if (nextLower) {
+          console.log('Up:Down, index: ', i, ' ,Value: ', chart[i].value, '\n');
           downcounter += 1;
         }
         if (downcounter >= 3) {
           upcounter = 0;
           up = false;
-          console.log("Found Peak going down, index: ", i,
-                      " ,Value: ", chart[i].value, "\n");
+          console.log(
+            'Found Peak going down, index: ', i,
+            ' ,Value: ', chart[i].value, '\n',
+          );
 
           // If this isn't the first peak
-          if (rr.length != 0) {
+          if (rr.length !== 0) {
             // remove duplicates:
             // alert(rr['l'].time);
-            if (chart[peak_idx].time <= rr[rr.length - 1].time) {
-              peak_val = 0;
+            if (chart[peakIndex].time <= rr[rr.length - 1].time) {
+              peakVal = 0;
               continue;
             }
             // Ignore this peak if it is too close to the prev
-            let latest_peak_time = rr[rr.length - 1].time;
-            let peak_time = chart[peak_idx].time;
-            let interpeak_distance = Math.abs(peak_time - latest_peak_time);
+            latestPeakTime = rr[rr.length - 1].time;
+            peakTime = chart[peakIndex].time;
+            interpeakDistance = Math.abs(peakTime - latestPeakTime);
 
-            if (interpeak_distance < MIN_INTERPEAK_DISTANCE) {
-              peak_val = 0;
+            if (interpeakDistance < MIN_INTERPEAK_DISTANCE) {
+              peakVal = 0;
               continue;
             }
           }
           // Record the location of the peak for processing
-          rr.push({time : chart[peak_idx].time, value : chart[peak_idx].value});
+          rr.push({ time: chart[peakIndex].time, value: chart[peakIndex].value });
 
           if (IDEALIZED_VISUALS) {
-            let peak_value = chart[peak_idx].value;
+            peakValue = chart[peakIndex].value;
             // Must add window_size in order to account for the delay
-            this.chart2.push({time : chart[peak_idx].time + 14, value : peak_value});
+            chart2.push({ time: chart[peakIndex].time + 14, value: peakValue });
             // Now add the idealized peak into the holding signal
 
             // Find where to insert the idealized signal in the
             // holding area
-            let found_match = false;
-            let target_time = chart[peak_idx].time;
+            let foundMatch = false;
+            const targetTime = chart[peakIndex].time;
             for (i = 0; i < WINDOW_SIZE; i += 1) {
-              if (holding_signal[i].time == target_time) {
-                found_match = true;
+              if (holdingSignal[i].time === targetTime) {
+                foundMatch = true;
                 break;
               }
             }
 
+            if (!foundMatch) {
+              alert('Something went wrong');
+            }
+
             // i is now the index where the matching value resides
-            let idealized_peak_index = 0;
+            let idealizedPeakIndex = 0;
 
             while (i < WINDOW_SIZE &&
-                   idealized_peak_index < PERFECT_PEAK.length) {
+                   idealizedPeakIndex < PERFECT_PEAK.length) {
               // insert the idealized peak into the signal
-              holding_signal[i] = {
-                time: holding_signal[i].time,
-                value: PERFECT_PEAK[idealized_peak_index] * peak_val
+              holdingSignal[i] = {
+                time: holdingSignal[i].time,
+                value: PERFECT_PEAK[idealizedPeakIndex] * peakVal,
               };
-              idealized_peak_index += 1;
+              idealizedPeakIndex += 1;
               i += 1;
             }
 
             // if full signal hasn't yet been added due to
             // peak overlapping end of window
-            let time_val = chart[peak_idx].time;
-            while (idealized_peak_index < PERFECT_PEAK.length) {
-              let push_val = PERFECT_PEAK[idealized_peak_index] * peak_val;
+            const timeVal = chart[peakIndex].time;
+            while (idealizedPeakIndex < PERFECT_PEAK.length) {
+              const pushVal = PERFECT_PEAK[idealizedPeakIndex] * peakVal;
 
-              this.holding_signal.push(
-                  {time : time_val + idealized_peak_index, value : push_val});
-              idealized_peak_index++;
+              holdingSignal.push({
+                time: timeVal + idealizedPeakIndex, value: pushVal,
+              });
+              idealizedPeakIndex += 1;
             }
           } else {
-            this.chart2.push(
-                {time : chart[peak_idx].time, value : chart[peak_idx].value});
+            chart2.push({
+              time: chart[peakIndex].time, value: chart[peakIndex].value,
+            });
           }
-          peak_val = 0;
+          peakVal = 0;
         }
       } else {
-        if (next_higher) {
-          console.log("Down:Up, index: ", i, " ,Value: ", chart[i].value, "\n");
+        if (nextHigher) {
+          console.log('Down:Up, index: ', i, ' ,Value: ', chart[i].value, '\n');
           upcounter += 1;
-        } else if (next_lower) {
-          console.log("Down:Down, index: ", i, " ,Value: ", chart[i].value,
-                      "\n");
+        } else if (nextLower) {
+          console.log(
+            'Down:Down, index: ', i, ' ,Value: ', chart[i].value,
+            '\n',
+          );
           upcounter -= 0;
         }
         if (upcounter >= 2) {
-          console.log("Down:Going up, index: ", i, " ,Value: ", chart[i].value,
-                      "\n");
+          console.log(
+            'Down:Going up, index: ', i, ' ,Value: ', chart[i].value,
+            '\n',
+          );
           downcounter = 0;
 
           up = true;
@@ -457,46 +475,45 @@ export default class HomePage extends Component {
       }
     }
 
-    console.log("chart2: ", chart2);
+    console.log('chart2: ', chart2);
   }
 
 
   calculateHRV() {
     // Calculate the true SAMPLING_FREQ (Frames / second)
-    SAMPLING_FREQ = total_frames / TEST_LENGTH;
+    SAMPLING_FREQ = totalFrames / TEST_LENGTH;
 
-    let sum_rr = 0;
+    let sumRR = 0;
     let rmssd = 0;
-    let rr_cnt = 0;
+    let rrCnt = 0;
 
-    let avg_rr = 0;
+    let avgRR = 0;
     for (let i = 1; i < rr.length - 1; i += 1) {
-      avg_rr += Math.abs(rr[i + 1].time - rr[i].time);
+      avgRR += Math.abs(rr[i + 1].time - rr[i].time);
     }
-    avg_rr /= rr.length - 1;
+    avgRR /= rr.length - 1;
 
-    let rr_lower_thresh = 0.7;
-    let rr_upper_thresh = 1.3;
-    let removed_count = 0;
+    const rrLowerThresh = 0.7;
+    const rrupperThresh = 1.3;
+    let removedCount = 0;
     for (let i = 1; i < rr.length - 1; i += 1) {
       // RR correction
-      if (Math.abs(rr[i].time - rr[i - 1].time) < rr_lower_thresh * avg_rr ||
-          Math.abs(rr[i + 1].time - rr[i].time) < rr_lower_thresh * avg_rr ||
-          Math.abs(rr[i].time - rr[i - 1].time) > rr_upper_thresh * avg_rr ||
-          Math.abs(rr[i + 1].time - rr[i].time) > rr_upper_thresh * avg_rr) {
-        removed_count += 1;
+      if (Math.abs(rr[i].time - rr[i - 1].time) < rrLowerThresh * avgRR ||
+          Math.abs(rr[i + 1].time - rr[i].time) < rrLowerThresh * avgRR ||
+          Math.abs(rr[i].time - rr[i - 1].time) > rrupperThresh * avgRR ||
+          Math.abs(rr[i + 1].time - rr[i].time) > rrupperThresh * avgRR) {
+        removedCount += 1;
       } else {
-        sum_rr += Math.pow((Math.abs(rr[i + 1].time - rr[i].time) -
-                            Math.abs(rr[i].time - rr[i - 1].time)),
-                           2);
-        rr_cnt += 1;
+        sumRR += (Math.abs(rr[i + 1].time - rr[i].time) -
+                            Math.abs(rr[i].time - rr[i - 1].time)) ** 2;
+        rrCnt += 1;
       }
     }
-    console.log("Had this many peaks: " + rr.length);
-    console.log("really removed: " + removed_count);
+    console.log('Had this many peaks: ' + rr.length);
+    console.log('really removed: ' + removedCount);
 
-    if (rr_cnt) {
-      rmssd = Math.sqrt(sum_rr / rr_cnt);
+    if (rrCnt) {
+      rmssd = Math.sqrt(sumRR / rrCnt);
       // alert('rmssd before multiplying: ' + rmssd);
     } else {
       alert('No rrs!');
@@ -526,7 +543,7 @@ export default class HomePage extends Component {
       lastname: this.props.lastname,
       team: this.props.team,
       timestamp: Math.round(Date.now() / 1000), // We want time in seconds
-      data: { hrv: rmssd, pleth: full_signal },
+      data: { hrv: rmssd, pleth: fullSignal },
     });
 
     clearInterval(this._interval);
@@ -605,16 +622,16 @@ export default class HomePage extends Component {
                                             parent: {border: "1px solid #ccc"},
                                             data: { stroke: "#c43a31", strokeWidth: 2 }
                                         }}
-                                        domain={{y: [lower_y_limit, upper_y_limit], x: [displayed_signal[0].time, displayed_signal[WINDOW_SIZE-1].time]}}
-                                        data={displayed_signal}
+                                        domain={{y: [lowerYLimit, upperYLimit], x: [displayedSignal[0].time, displayedSignal[WINDOW_SIZE-1].time]}}
+                                        data={displayedSignal}
                                         x="time"
                                         y="value" />
 
                                     <VictoryScatter
                                         style={{ data: { fill: "#c43a31" } }}
                                         size={7}
-                                        domain={{y: [lower_y_limit, upper_y_limit], x: [displayed_signal[0].time, displayed_signal[WINDOW_SIZE-1].time]}}
-                                        data={displayed_peaks}
+                                        domain={{y: [lowerYLimit, upperYLimit], x: [displayedSignal[0].time, displayedSignal[WINDOW_SIZE-1].time]}}
+                                        data={displayedPeaks}
                                         x="time"
                                         y="value"  />
 

@@ -117,7 +117,7 @@ export default class LoginForm extends Component {
           secureTextEntry={true}
           returnKeyType="go"
           onChangeText={password => this.setState({ password })}
-          ref = {input => this.passwordInput = input}
+          ref = { (input) => { this.passwordInput = input; }}
           autoCapitalize="none"
           autoCorrect={false}
           style={styles.input}
