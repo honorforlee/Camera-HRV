@@ -1,4 +1,4 @@
-import React, {Component} from 'react';
+import React, { Component } from 'react';
 import {
   AppRegistry,
   Image,
@@ -6,12 +6,12 @@ import {
   NativeModules,
   StyleSheet,
   Text,
-  View
+  View,
 } from 'react-native';
-import Button from 'react-native-button'
-import ProgressBar from 'react-native-progress/Circle'
-import {Actions} from 'react-native-router-flux';
-import Svg, {Circle, Rect} from 'react-native-svg';
+import Button from 'react-native-button';
+import ProgressBar from 'react-native-progress/Circle';
+import { Actions } from 'react-native-router-flux';
+import Svg, { Circle, Rect } from 'react-native-svg';
 import io from 'socket.io-client';
 import {
   VictoryArea,
@@ -21,7 +21,7 @@ import {
   VictoryLine,
   VictoryScatter,
   VictoryStack,
-  VictoryTheme
+  VictoryTheme,
 } from 'victory-native';
 
 // Test length in seconds
@@ -34,83 +34,81 @@ const PEAK_DETECTION_INTERVAL = 60;
 const IDEALIZED_VISUALS = false;
 
 // Signal that is currently displayed on graph
-var displayed_signal = [];
+let displayed_signal = [];
 // Peaks that are being displayed
-var displayed_peaks = [];
+let displayed_peaks = [];
 // Signal that is about to be displayed, used for idealized visuals mode
-var holding_signal = [];
+let holding_signal = [];
 
 // Normalized signal that is used to draw idealized peaks.
 const PERFECT_PEAK = [
-  0.0,         0.00295858,  0.00887574,  0.014792899, 0.023668639, 0.029585799,
+  0.0, 0.00295858, 0.00887574, 0.014792899, 0.023668639, 0.029585799,
   0.047337278, 0.088757396, 0.118343195, 0.210059172, 0.417159763, 0.689349112,
-  0.914201183, 0.99704142,  0.940828402, 0.789940828, 0.615384615, 0.461538462,
-  0.346153846, 0.266272189, 0.233727811, 0.24852071,  0.289940828, 0.322485207,
+  0.914201183, 0.99704142, 0.940828402, 0.789940828, 0.615384615, 0.461538462,
+  0.346153846, 0.266272189, 0.233727811, 0.24852071, 0.289940828, 0.322485207,
   0.325443787, 0.286982249, 0.224852071, 0.153846154, 0.085798817, 0.038461538,
-  0.01183432,  0.0
+  0.01183432, 0.0,
 ];
 
 // Full signal from start to finish
-var full_signal = [];
+let full_signal = [];
 
 // Holds the raw signal. Used for the calculation of peaks
-var chart = [];
+let chart = [];
 
 // Holds peaks. Peaks are removed either when they go offscreen or when
 // they first become visible, depending on whether idealized visuals are
 // shown or not.
-var chart2 = [];
+let chart2 = [];
 
 // Holds all time value pairs for detected peaks
-var rr = [];
+let rr = [];
 
 // Upper bound of y values displayed on graph
-var upper_y_limit = 0;
+let upper_y_limit = 0;
 // Lower bound of y values displayed on graph
-var lower_y_limit = 0;
+let lower_y_limit = 0;
 
 // The 'x' value of next frame. This frame is the cnt'th frame received.
-var cnt = 0;
+let cnt = 0;
 
 // Counter used to determine when peak detection interval is reached
-var window_idx = 0;
+let window_idx = 0;
 
 // Total number of frames collected during the test
-var total_frames = 0;
+let total_frames = 0;
 
 // Width of viewing window, in samples
 const WINDOW_SIZE = 200;
 
 // Standard deviation in the 60 most recent samples
-var recentStandardDeviation = 200;
+let recentStandardDeviation = 200;
 
 // TODO(Tyler): This may be thirty if the device does not support 60 fps
 // Tentatively 60 during the recording phase, updated to real value for
 // calculation of HRV
-var SAMPLING_FREQ = 60;
+let SAMPLING_FREQ = 60;
 
 // Place default values in the arrays, filling them to WINDOW_SIZE
-for (i = 0; i < WINDOW_SIZE; i++) {
-  chart.push({time : i, value : 0});
-  displayed_signal.push({time : -2 * WINDOW_SIZE + i, value : 0});
-  holding_signal.push({time : -WINDOW_SIZE + i, value : 0});
+for (let i = 0; i < WINDOW_SIZE; i += 1) {
+  chart.push({ time: i, value: 0 });
+  displayed_signal.push({ time: (-2 * WINDOW_SIZE) + i, value: 0 });
+  holding_signal.push({ time: -WINDOW_SIZE + i, value: 0 });
 }
 
-var CameraController = require('NativeModules').CameraController;
+const { CameraController } = require('NativeModules').CameraController;
+
 const myModuleEvt = new NativeEventEmitter(CameraController);
 
 export default class HomePage extends Component {
-
-  constructor(props) { super(props); }
-
   state = {
-    width : null,
+    width: null,
     height: null,
     hrv: '...', // Text displayed to the user
     torchMode: null,
     indeterminate: true, // Whether the progress bar should spin or not
     hrvProgress: 0,
-    draw_ctr: 0 // UI draws when draw_ctr equals zero
+    draw_ctr: 0, // UI draws when draw_ctr equals zero
   }
 
   /**
@@ -118,7 +116,19 @@ export default class HomePage extends Component {
    * draw_ctr has cycled back to zero. Used to control refresh rate.
    */
   shouldComponentUpdate(nextProps, nextState) {
-    return nextState.draw_ctr == 0;
+    return nextState.draw_ctr === 0;
+  }
+
+  onLayout =
+      (event) => {
+        const { width, height } = event.nativeEvent.layout;
+
+        this.setState({ width, height });
+      }
+
+  onComponentWillUnmount() {
+    this.listener.remove();
+    clearInterval(this._interval);
   }
 
   /**
@@ -126,13 +136,13 @@ export default class HomePage extends Component {
    * Records the new frame, updates window dimensions, and detects peaks
    * if necessary.
    */
-  update(data) {
+  processFrame(data) {
     // Log that another frame has been received
-    total_frames++;
-    this.setState({rgb : data});
-    this.setState((state) => ({draw_ctr : ((state.draw_ctr + 1) % 5)}));
+    total_frames += 1;
+    this.setState({ rgb: data });
+    this.setState(state => ({ draw_ctr: ((state.draw_ctr + 1) % 5) }));
 
-    var int_data = parseInt(data);
+    const int_data = parseInt(data, 10);
 
     // Record this bit of the signal
     full_signal.push(int_data);
@@ -141,8 +151,8 @@ export default class HomePage extends Component {
     window_idx += 1;
 
     // 1 is the first value inserted
-    if (displayed_signal[WINDOW_SIZE - 1].time == 1) {
-      this.setState({hrv : 'HRV: calculating'});
+    if (displayed_signal[WINDOW_SIZE - 1].time === 1) {
+      this.setState({ hrv: 'HRV: calculating' });
     }
 
     // Code to display the actual signal
@@ -159,12 +169,12 @@ export default class HomePage extends Component {
       }
 
       // If there are no peaks, push a peak with negative value
-      if (chart2.length == 0) {
-        chart2.push({time : chart[1].time, value : -10});
+      if (chart2.length === 0) {
+        chart2.push({ time: chart[1].time, value: -10 });
       }
 
       // Append the latest frame received
-      chart.push({time : cnt, value : int_data});
+      chart.push({ time: cnt, value: int_data });
 
       // The raw information is what we display as visuals are not
       // idealized
@@ -178,18 +188,18 @@ export default class HomePage extends Component {
 
       // Remove the oldest raw datapoint and append the new raw frame data
       chart.shift();
-      chart.push({time : cnt, value : int_data});
+      chart.push({ time: cnt, value: int_data });
 
       // Remove the first displayed point as a new frame is incoming
       // Add the new frame from the holding signal to displayed_signal
       displayed_signal.shift();
-      var new_point = holding_signal.shift();
+      const new_point = holding_signal.shift();
       displayed_signal.push(new_point);
 
       // Remove displayed peaks that are no longer visible
-      var leftmost_edge = displayed_signal[0].time;
+      const leftmost_edge = displayed_signal[0].time;
       while (displayed_peaks.length >= 1) {
-        var earliest_peak = displayed_peaks[0].time;
+        const earliest_peak = displayed_peaks[0].time;
         if (earliest_peak > 0 && earliest_peak < leftmost_edge) {
           displayed_peaks.shift();
         } else {
@@ -200,8 +210,8 @@ export default class HomePage extends Component {
       // append peaks from chart2 onto the displayed peaks only when
       // they become visible
       if (chart2.length >= 1) {
-        var latest_time = displayed_signal[WINDOW_SIZE - 1].time;
-        var earliest_waiting_peak = chart2[0].time;
+        const latest_time = displayed_signal[WINDOW_SIZE - 1].time;
+        const earliest_waiting_peak = chart2[0].time;
         if (earliest_waiting_peak <= latest_time) {
           displayed_peaks.push(chart2.shift());
         }
@@ -211,11 +221,11 @@ export default class HomePage extends Component {
       // at its ideal length
       if (holding_signal.length < WINDOW_SIZE) {
         // add window size to account for the part thats already filled
-        holding_signal.push({time : cnt, value : 0});
+        holding_signal.push({ time: cnt, value: 0 });
       }
     }
 
-    if (window_idx == PEAK_DETECTION_INTERVAL) {
+    if (window_idx === PEAK_DETECTION_INTERVAL) {
       window_idx = 0;
 
       // Calculate upper and lower limits for graph y axis
@@ -235,11 +245,12 @@ export default class HomePage extends Component {
    */
   detectPoorSignal() {
     if (recentStandardDeviation < 30 && total_frames >= 200) {
-      this.setState({hrv : 'Poor Signal'});
+      this.setState({ hrv: 'Poor Signal' });
     } else if (recentStandardDeviation >= 25 && total_frames >= 200) {
-      this.setState({hrv : 'HRV: calculating'});
+      this.setState({ hrv: 'HRV: calculating' });
     }
   }
+
 
   /**
    * Calculates the standard deviation within the most recent frames.
@@ -248,30 +259,28 @@ export default class HomePage extends Component {
     // Number of frames to include in the calculation. Only includes most
     // recent frames.
     const Calc_Width = 100;
-    var length = chart.length;
 
-    var count = 0;
-    var sum = 0;
+    let count = 0;
+    let sum = 0;
 
-    for (var i = 1; i <= Calc_Width && length - i >= 0; i++) {
-      sum += chart[length - i].value;
-      count++;
+    for (let i = 1; i <= Calc_Width && chart.length - i >= 0; i += 1) {
+      sum += chart[chart.length - i].value;
+      count += 1;
     }
 
-    var averageBrightness = sum / count;
-    var int_avg = Math.floor(averageBrightness);
+    const averageBrightness = sum / count;
 
-    var sumOfSquaredDifferences = 0;
+    let sumOfSquaredDifferences = 0;
 
-    for (var i = 1; i <= Calc_Width && length - i >= 0; i++) {
-      var currBrightness = chart[length - i].value;
-      var difference = Math.abs(currBrightness - averageBrightness);
-      sumOfSquaredDifferences += Math.pow(difference, 2);
+    for (let i = 1; i <= Calc_Width && chart.length - i >= 0; i += 1) {
+      const currBrightness = chart[chart.length - i].value;
+      const difference = Math.abs(currBrightness - averageBrightness);
+      sumOfSquaredDifferences += difference ** 2;
     }
 
-    var avgSquaredDifference = sumOfSquaredDifferences / count;
-    var standardDeviation = Math.sqrt(avgSquaredDifference);
-    recentStandardDeviation = standardDeviation;
+    const avgSquaredDifference = sumOfSquaredDifferences / count;
+    const standardDeviation = Math.sqrt(avgSquaredDifference);
+    this.recentStandardDeviation = standardDeviation;
   }
 
   /**
@@ -281,40 +290,40 @@ export default class HomePage extends Component {
   calcWindowStats() {
     if (!IDEALIZED_VISUALS) {
       // Set range based on standard deviation
-      var sum = 0;
+      let sum = 0;
 
-      for (var i = 0; i < chart.length; i++) {
+      for (let i = 0; i < chart.length; i += 1) {
         sum += chart[i].value;
       }
 
-      var averageBrightness = sum / chart.length;
-      var int_avg = Math.floor(averageBrightness);
+      const averageBrightness = sum / chart.length;
+      const int_avg = Math.floor(averageBrightness);
 
-      var sumOfSquaredDifferences = 0;
+      let sumOfSquaredDifferences = 0;
 
-      for (var i = 0; i < chart.length; i++) {
-        var currBrightness = chart[i].value;
-        var difference = Math.abs(currBrightness - averageBrightness);
+      for (let i = 0; i < chart.length; i += 1) {
+        const currBrightness = chart[i].value;
+        const difference = Math.abs(currBrightness - averageBrightness);
         sumOfSquaredDifferences += Math.pow(difference, 2);
       }
 
-      var avgSquaredDifference = sumOfSquaredDifferences / chart.length;
-      var standardDeviation = Math.sqrt(avgSquaredDifference);
-      var sigma = Math.ceil(standardDeviation);
+      const avgSquaredDifference = sumOfSquaredDifferences / chart.length;
+      const standardDeviation = Math.sqrt(avgSquaredDifference);
+      const sigma = Math.ceil(standardDeviation);
 
-      upper_y_limit = int_avg + 3 * sigma;
-      lower_y_limit = int_avg - 3 * sigma;
+      this.upper_y_limit = int_avg + (3 * sigma);
+      this.lower_y_limit = int_avg - (3 * sigma);
     } else {
       // If showing the idealized signal, the lower peak should be zero
       // max should be a bit over the peak's value
-      var max = -1;
-      for (var i = 0; i < chart.length; i++) {
+      let max = -1;
+      for (let i = 0; i < chart.length; i += 1) {
         if (chart[i].value > max) {
           max = chart[i].value;
         }
       }
-      upper_y_limit = 1.1 * max;
-      lower_y_limit = 0;
+      this.upper_y_limit = 1.1 * max;
+      this.lower_y_limit = 0;
     }
   }
 
@@ -330,14 +339,14 @@ export default class HomePage extends Component {
     const MIN_INTERPEAK_DISTANCE = PERFECT_PEAK.length;
 
     // Initialize values for state machine
-    var up = false;
-    var upcounter = 0;
-    var downcounter = 0;
-    var peak_idx = 0;
-    var peak_val = 0;
-    var avg = 0;
+    let up = false;
+    let upcounter = 0;
+    let downcounter = 0;
+    let peak_idx = 0;
+    let peak_val = 0;
+    let avg = 0;
 
-    for (i = 0; i < WINDOW_SIZE - 1; i++) {
+    for (i = 0; i < WINDOW_SIZE - 1; i += 1) {
       avg += chart[i].value;
 
       next_higher = chart[i + 1].value - chart[i].value >= 10;
@@ -370,9 +379,9 @@ export default class HomePage extends Component {
               continue;
             }
             // Ignore this peak if it is too close to the prev
-            var latest_peak_time = rr[rr.length - 1].time;
-            var peak_time = chart[peak_idx].time;
-            var interpeak_distance = Math.abs(peak_time - latest_peak_time);
+            let latest_peak_time = rr[rr.length - 1].time;
+            let peak_time = chart[peak_idx].time;
+            let interpeak_distance = Math.abs(peak_time - latest_peak_time);
 
             if (interpeak_distance < MIN_INTERPEAK_DISTANCE) {
               peak_val = 0;
@@ -383,16 +392,16 @@ export default class HomePage extends Component {
           rr.push({time : chart[peak_idx].time, value : chart[peak_idx].value});
 
           if (IDEALIZED_VISUALS) {
-            var peak_value = chart[peak_idx].value;
+            let peak_value = chart[peak_idx].value;
             // Must add window_size in order to account for the delay
-            chart2.push({time : chart[peak_idx].time + 14, value : peak_value});
+            this.chart2.push({time : chart[peak_idx].time + 14, value : peak_value});
             // Now add the idealized peak into the holding signal
 
             // Find where to insert the idealized signal in the
             // holding area
-            var found_match = false;
-            var target_time = chart[peak_idx].time;
-            for (i = 0; i < WINDOW_SIZE; i++) {
+            let found_match = false;
+            let target_time = chart[peak_idx].time;
+            for (i = 0; i < WINDOW_SIZE; i += 1) {
               if (holding_signal[i].time == target_time) {
                 found_match = true;
                 break;
@@ -400,31 +409,31 @@ export default class HomePage extends Component {
             }
 
             // i is now the index where the matching value resides
-            var idealized_peak_index = 0;
+            let idealized_peak_index = 0;
 
             while (i < WINDOW_SIZE &&
                    idealized_peak_index < PERFECT_PEAK.length) {
               // insert the idealized peak into the signal
               holding_signal[i] = {
-                time : holding_signal[i].time,
-                value : PERFECT_PEAK[idealized_peak_index] * peak_val
+                time: holding_signal[i].time,
+                value: PERFECT_PEAK[idealized_peak_index] * peak_val
               };
-              idealized_peak_index++;
-              i++;
+              idealized_peak_index += 1;
+              i += 1;
             }
 
             // if full signal hasn't yet been added due to
             // peak overlapping end of window
-            var time_val = chart[peak_idx].time;
+            let time_val = chart[peak_idx].time;
             while (idealized_peak_index < PERFECT_PEAK.length) {
-              var push_val = PERFECT_PEAK[idealized_peak_index] * peak_val;
+              let push_val = PERFECT_PEAK[idealized_peak_index] * peak_val;
 
-              holding_signal.push(
+              this.holding_signal.push(
                   {time : time_val + idealized_peak_index, value : push_val});
               idealized_peak_index++;
             }
           } else {
-            chart2.push(
+            this.chart2.push(
                 {time : chart[peak_idx].time, value : chart[peak_idx].value});
           }
           peak_val = 0;
@@ -451,37 +460,31 @@ export default class HomePage extends Component {
     console.log("chart2: ", chart2);
   }
 
-  onLayout =
-      (event) => {
-        const {width, height} = event.nativeEvent.layout;
-
-        this.setState({width, height});
-      }
 
   calculateHRV() {
     // Calculate the true SAMPLING_FREQ (Frames / second)
     SAMPLING_FREQ = total_frames / TEST_LENGTH;
 
-    sum_rr = 0;
-    rmssd = 0;
-    rr_cnt = 0;
+    let sum_rr = 0;
+    let rmssd = 0;
+    let rr_cnt = 0;
 
-    avg_rr = 0;
-    for (i = 1; i < rr.length - 1; i++) {
+    let avg_rr = 0;
+    for (let i = 1; i < rr.length - 1; i += 1) {
       avg_rr += Math.abs(rr[i + 1].time - rr[i].time);
     }
     avg_rr /= rr.length - 1;
 
-    var rr_lower_thresh = 0.7;
-    var rr_upper_thresh = 1.3;
-    var removed_count = 0;
-    for (i = 1; i < rr.length - 1; i++) {
+    let rr_lower_thresh = 0.7;
+    let rr_upper_thresh = 1.3;
+    let removed_count = 0;
+    for (let i = 1; i < rr.length - 1; i += 1) {
       // RR correction
       if (Math.abs(rr[i].time - rr[i - 1].time) < rr_lower_thresh * avg_rr ||
           Math.abs(rr[i + 1].time - rr[i].time) < rr_lower_thresh * avg_rr ||
           Math.abs(rr[i].time - rr[i - 1].time) > rr_upper_thresh * avg_rr ||
           Math.abs(rr[i + 1].time - rr[i].time) > rr_upper_thresh * avg_rr) {
-        removed_count = removed_count + 1;
+        removed_count += 1;
       } else {
         sum_rr += Math.pow((Math.abs(rr[i + 1].time - rr[i].time) -
                             Math.abs(rr[i].time - rr[i - 1].time)),
@@ -501,16 +504,16 @@ export default class HomePage extends Component {
     }
 
     rmssd *= 1000.0 / SAMPLING_FREQ;
-    this.setState({hrv : 'HRV: ' + Math.floor(rmssd), indeterminate : true});
+    this.setState({ hrv: 'HRV: ' + Math.floor(rmssd), indeterminate: true });
     // Set draw_ctr to zero so that UI will draw
-    this.setState({draw_ctr : 0});
+    this.setState({ draw_ctr: 0 });
     rr = [];
 
     alert('Measurement complete!');
 
     console.log('Opening socket to server');
     const socket =
-        io('http://er-lab.cs.ucla.edu:443', {transports : [ 'websocket' ]});
+        io('http://er-lab.cs.ucla.edu:443', { transports: ['websocket'] });
 
     socket.on('connect_error', (error) => {
       console.log('Error sending data to server' + error);
@@ -518,12 +521,12 @@ export default class HomePage extends Component {
     });
 
     socket.send({
-      type : 'hrv',
-      firstname : this.props.firstname,
-      lastname : this.props.lastname,
-      team : this.props.team,
-      timestamp : Math.round(Date.now() / 1000), // We want time in seconds
-      data : {hrv : rmssd, pleth : full_signal}
+      type: 'hrv',
+      firstname: this.props.firstname,
+      lastname: this.props.lastname,
+      team: this.props.team,
+      timestamp: Math.round(Date.now() / 1000), // We want time in seconds
+      data: { hrv: rmssd, pleth: full_signal },
     });
 
     clearInterval(this._interval);
@@ -540,11 +543,14 @@ export default class HomePage extends Component {
   start() {
     rr = [];
     this.listener =
-        myModuleEvt.addListener('sayHello', (data) => this.update(data));
+      myModuleEvt.addListener('sayHello', data => this.processFrame(data));
     CameraController.start();
     CameraController.turnTorchOn(true);
-    this.setState(
-        {indeterminate : false, hrvProgress : 0, hrv : 'Starting...'});
+    this.setState({
+      indeterminate: false,
+      hrvProgress: 0,
+      hrv: 'Starting...',
+    });
     setTimeout(() => this.calculateHRV(), 1000 * TEST_LENGTH);
     this._interval =
         setInterval(() => this.updateProgress(), PROGRESS_BAR_INTERVAL * 1000);
@@ -554,14 +560,9 @@ export default class HomePage extends Component {
     // There are TEST_LENGTH / PROGRESS_BAR_INTERVAL ticks
     // After all ticks are complete, bar must be completely progressed
     this.setState({
-      hrvProgress :
-          this.state.hrvProgress + (1.0 / (TEST_LENGTH / PROGRESS_BAR_INTERVAL))
+      hrvProgress:
+        this.state.hrvProgress + (1.0 / (TEST_LENGTH / PROGRESS_BAR_INTERVAL)),
     });
-  }
-
-  onComponentWillUnmount() {
-    this.listener.remove();
-    clearInterval(this._interval);
   }
 
   render() {
@@ -630,8 +631,6 @@ export default class HomePage extends Component {
             );
        }
 }
-
-
 
 const styles = StyleSheet.create({
     mainContainer: {

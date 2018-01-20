@@ -22,8 +22,8 @@ Tested with the following environment:
 * macOS 10.13.2
 
 To set up the build environment, take the following steps:
-1. If not already installed, install node.js, available [here](https://nodejs.org/en/download/). Alternatively, node can be installed with `brew install node` if you have homebrew installed.
-2. The React Native developers recommend installing watchman for performance, which can be done with `brew install watchman`.
+1. If not already installed, install node.js, available [here](https://nodejs.org/en/download/). Alternatively, do `$brew install node` if you have homebrew installed.
+2. The React Native developers recommend installing watchman for performance. To install, do ```$ brew install watchman```
 3. From this project's root directory, run `npm install`. This should install all of the project's necessary dependencies.
 
 At this point, the project can be opened and built in Xcode. To do this, open the `Camera-HRV/ios/CameraHRV2.xcodeproj` in Xcode.
@@ -79,3 +79,7 @@ This instructs the device to load code from the static bundle, rather than the d
 Lastly, to run the app, open the project in Xcode, select the device, and press run.
 
 To build so that the app can be distributed, press `⌘B` or select `Product -> Build`.
+
+Misc
+====
+For style, we try to adhere to the Airbnb Javascript Style guide, available [here](https://www.airbnb.com). Tools such as `clang-format` may be used to help format code, though I can't guarantee they'll fit in with the style guide. I've been using ESlint, along with `eslint-config-airbnb eslint-plugin-import eslint-plugin-react eslint-plugin-jsx-a11y babel-eslint` to lint the project (these should be installed with npm install I believe). It's not perfect at present, but new code should be checked moving forward.
