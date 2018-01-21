@@ -9,28 +9,28 @@
 	"dependencies": {
 		"react": "^16.2.0",
 		"react-native": "^0.52.0",
-		"react-native-button": "^2.1.0",
+		"react-native-button": "^2.2.0",
 		"react-native-circular-progress": "^0.1.2",
 		"react-native-progress": "^3.4.0",
-		"react-native-router-flux": "^4.0.0-beta.24",
-		"react-native-svg": "^5.5.1",
+		"react-native-router-flux": "^4.0.0-beta.28",
+		"react-native-svg": "^6.0.1-rc.3",
 		"socket.io": "^2.0.4",
 		"socket.io-client": "^2.0.4",
-		"victory-native": "^0.14.0"
+		"victory-native": "^0.16.6"
 	},
 	"devDependencies": {
 		"ajv": "^6.0.1",
 		"ajv-keywords": "^3.0.0",
 		"babel-eslint": "^8.2.1",
-		"babel-jest": "20.0.3",
-		"babel-preset-react-native": "3.0.1",
+		"babel-jest": "22.1.0",
+		"babel-preset-react-native": "4.0.0",
 		"eslint": "^4.16.0",
 		"eslint-config-airbnb": "^16.1.0",
 		"eslint-plugin-import": "^2.8.0",
 		"eslint-plugin-jsx-a11y": "^6.0.3",
 		"eslint-plugin-react": "^7.5.1",
-		"jest": "20.0.4",
-		"react-test-renderer": "16.0.0-alpha.12"
+		"jest": "22.1.4",
+		"react-test-renderer": "16.2.0"
 	},
 	"jest": {
 		"preset": "react-native"
