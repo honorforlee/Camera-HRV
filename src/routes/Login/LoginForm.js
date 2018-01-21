@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import {
+  NetInfo,
   StyleSheet,
   Text,
   TextInput,
@@ -27,6 +28,34 @@ const styles = StyleSheet.create({
   },
 });
 
+// The current type of connection, from connectionInfo.type
+let currConnectionType;
+
+// Number of times the connection type has changed.
+let changeNumber = 1;
+
+// Get the original connection information. This will initially be unknown
+// due to the way the system works.
+NetInfo.getConnectionInfo().then((connectionInfo) => {
+  console.log(`Initial, type: ${connectionInfo.type}` +
+    `, effectiveType: ${connectionInfo.effectiveType}`);
+  currConnectionType = connectionInfo.type;
+});
+
+function connectivityChangeHandler(connectionInfo) {
+  console.log(`${changeNumber} change, type: ${connectionInfo.type}` +
+        `, effectiveType: ${connectionInfo.effectiveType}`);
+  changeNumber += 1;
+  currConnectionType = connectionInfo.type;
+}
+
+// Add a listener for changes to the connection type. This ensures that the
+// knowledge of the connection is always up to date and accurate.
+NetInfo.addEventListener(
+  'connectionChange',
+  connectivityChangeHandler,
+);
+
 export default class LoginForm extends Component {
   /**
    * Handle errors encountered during the attempt to log in.
@@ -53,11 +82,11 @@ export default class LoginForm extends Component {
       return;
     }
 
-    const isConnected = true;
+    const isConnected =
+      (currConnectionType !== 'unknown') && (currConnectionType !== 'none');
+
     if (!isConnected) {
-      alert('No internet connection. Please check connection and ' +
-            'try again.');
-      Actions.Login();
+      alert('No internet connection. Please check connection and try again.');
     } else {
       fetch('http://er-lab.cs.ucla.edu:443/mobile/login', {
         method: 'POST',
@@ -74,7 +103,7 @@ export default class LoginForm extends Component {
         .then(response => response.json())
         .then((responseData) => {
           if (!responseData) {
-            alert('New Exception');
+            alert('No responseData in response from login server.');
           }
           if (responseData.success) {
             if (responseData.role === 'athlete') {
