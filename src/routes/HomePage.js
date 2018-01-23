@@ -434,9 +434,12 @@ export default class HomePage extends Component {
             // Find where to insert the idealized signal in the
             // holding area
             let foundMatch = false;
+            // 'i' in use by outer loop. j is used to iterate
+            // through holdingSignal
+            let j;
             const targetTime = chart[peakIndex].time;
-            for (i = 0; i < WINDOW_SIZE; i += 1) {
-              if (holdingSignal[i].time === targetTime) {
+            for (j = 0; j < WINDOW_SIZE; j += 1) {
+              if (holdingSignal[j].time === targetTime) {
                 foundMatch = true;
                 break;
               }
@@ -449,15 +452,15 @@ export default class HomePage extends Component {
             // i is now the index where the matching value resides
             let idealizedPeakIndex = 0;
 
-            while (i < WINDOW_SIZE &&
+            while (j < WINDOW_SIZE &&
                    idealizedPeakIndex < PERFECT_PEAK.length) {
               // insert the idealized peak into the signal
-              holdingSignal[i] = {
-                time: holdingSignal[i].time,
+              holdingSignal[j] = {
+                time: holdingSignal[j].time,
                 value: PERFECT_PEAK[idealizedPeakIndex] * peakVal,
               };
               idealizedPeakIndex += 1;
-              i += 1;
+              j += 1;
             }
 
             // if full signal hasn't yet been added due to
