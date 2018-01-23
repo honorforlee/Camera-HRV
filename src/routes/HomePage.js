@@ -557,22 +557,23 @@ export default class HomePage extends Component {
 
     alert('Measurement complete!');
 
-    console.log('Opening socket to server');
-    const socket =
-        io('http://er-lab.cs.ucla.edu:443', { transports: ['websocket'] });
+    console.log('Sending data to server');
 
-    socket.on('connect_error', (error) => {
-      console.log('Error sending data to server' + error);
-      alert('Error sending data to server' + error);
-    });
-
-    socket.send({
-      type: 'hrv',
-      firstname: this.props.firstname,
-      lastname: this.props.lastname,
-      team: this.props.team,
-      timestamp: Math.round(Date.now() / 1000), // We want time in seconds
-      data: { hrv: rmssd, pleth: fullSignal },
+    fetch('http://er-lab.cs.ucla.edu:443/mobile/hrv', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        type: 'hrv',
+        firstname: this.props.firstname,
+        lastname: this.props.lastname,
+        team: this.props.team,
+        timestamp: Math.round(Date.now() / 1000), // We want time in seconds
+        data: { hrv: rmssd, signal: fullSignal },
+      }),
     });
 
     clearInterval(this._interval);

@@ -61,6 +61,7 @@ export default class LoginForm extends Component {
     } else {
       fetch('http://er-lab.cs.ucla.edu:443/mobile/login', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
