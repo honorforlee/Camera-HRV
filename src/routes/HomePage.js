@@ -574,7 +574,8 @@ export default class HomePage extends Component {
         timestamp: Math.round(Date.now() / 1000), // We want time in seconds
         data: { hrv: rmssd, signal: fullSignal },
       }),
-    });
+    })
+      .catch(error => alert(`Error when submitting data: ${error}`));
 
     clearInterval(this._interval);
     CameraController.turnTorchOn(false);
