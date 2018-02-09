@@ -95,7 +95,7 @@ export default class LoginForm extends Component {
             Actions.Login();
           }
         })
-        .catch(error => alert(error))
+        .catch(error => alert(`An error occurred when signing in: ${error}`))
         .done();
     }
   }
