@@ -95,6 +95,7 @@ export default class LoginForm extends Component {
             Actions.Login();
           }
         })
+        .catch(error => alert(error))
         .done();
     }
   }
